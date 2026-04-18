@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="
+      width=device-width,
+      initial-scale=1.0,
+      maximum-scale=1.0,
+      user-scalable=no,
+      viewport-fit=cover
+    "
+  />
+  <title>Snap2Play - Puzzle</title>
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    .game-wrap {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      padding-bottom: 24px;
+    }
+
+    .board-wrap {
+      width: min(92vw, 520px);
+      margin: 14px auto 0;
+      position: relative;
+    }
+
+    .board {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      display: grid;
+      gap: 2px;
+      touch-action: none;
+      background: rgba(255,255,255,0.10);
+      border-radius: 14px;
+      padding: 2px;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.22);
+    }
+
+    .puzzle-piece {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+      overflow: hidden;
+      background-repeat: no-repeat;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.22);
+      transform: translateZ(0);
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .puzzle-piece:active {
+      cursor: grabbing;
+    }
+
+    .puzzle-piece.hover-target {
+      outline: 4px solid rgba(255, 213, 74, .92);
+      box-shadow:
+        0 0 0 6px rgba(255, 213, 74, .28) inset,
+        0 10px 28px rgba(0,0,0,.35);
+    }
+
+    .puzzle-piece.dragging {
+      opacity: .35;
+    }
+
+    .drag-clone {
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+
+    .win {
+      display: none;
+      margin-top: 18px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .win-title {
+      font-size: 28px;
+      font-weight: 900;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.3);
+      margin-bottom: 8px;
+    }
+
+    .win-badge {
+      position: absolute;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      width: fit-content;
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: linear-gradient(90deg,#22c55e,#a3e635);
+      color: #0b1022;
+      font-weight: 900;
+      letter-spacing: .4px;
+      z-index: 5;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+    }
+
+    @media (orientation: landscape) {
+      body {
+        overflow-y: auto;
+      }
+
+      .board-wrap {
+        width: min(62vh, 520px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page game-wrap">
+    <div class="top-bar">
+      <div class="back-btn" onclick="goBack()">←</div>
+      <div class="top-title">Puzzle</div>
+      <div style="width:50px;"></div>
+    </div>
+
+    <div class="diff-row">
+      <div id="chip-3" class="diff-chip active" onclick="setSize(3)">3x3</div>
+      <div id="chip-4" class="diff-chip" onclick="setSize(4)">4x4</div>
+      <div class="diff-chip locked" onclick="premium()">5x5 🔒</div>
+      <div class="diff-chip locked" onclick="premium()">6x6 🔒</div>
+    </div>
+
+    <div class="board-wrap" id="boardWrap">
+      <div id="board" class="board"></div>
+    </div>
+
+    <!-- visas först när pusslet är klart -->
+    <div class="win" id="win">
+      <div class="win-title">🎉 Great job!</div>
+      <div class="actions">
+        <button class="action-btn secondary" onclick="saveGame()">💾 Save</button>
+        <button class="action-btn" onclick="shareGame()">🚀 Challenge</button>
+      </div>
+      <div class="actions">
+        <button class="action-btn secondary" onclick="restart()">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const FREE_LIMIT = 3;
+    const SHARE_LIFETIME = 24 * 60 * 60 * 1000;
+
+    let image = localStorage.getItem("tempImage");
+    let config = JSON.parse(localStorage.getItem("gameConfig") || '{"type":"puzzle","size":3}');
+    let size = config?.size || 3;
+
+    const board = document.getElementById("board");
+    const boardWrap = document.getElementById("boardWrap");
+    const winEl = document.getElementById("win");
+
+    let puzzleSolved = false;
+
+    function persistConfig() {
+      localStorage.setItem("gameConfig", JSON.stringify({ type: "puzzle", size }));
+    }
+
+    function setActiveChip() {
+      document.querySelectorAll(".diff-chip").forEach(chip => chip.classList.remove("active"));
+      const active = document.getElementById(`chip-${size}`);
+      if (active) active.classList.add("active");
+    }
+
+    function setSize(newSize) {
+      size = newSize;
+      persistConfig();
+      setActiveChip();
+      restart();
+    }
+
+    function premium() {
+      alert("Premium coming 😄");
+    }
+
+    function goBack() {
+      window.location = "index.html";
+    }
+
+    function cleanupSharedGames() {
+      let shared = JSON.parse(localStorage.getItem("sharedGames") || "[]");
+      const now = Date.now();
+
+      shared = shared.filter(g => now - g.createdAt < SHARE_LIFETIME);
+      localStorage.setItem("sharedGames", JSON.stringify(shared));
+    }
+
+    function loadShared() {
+      const params = new URLSearchParams(location.search);
+      const id = params.get("share");
+      if (!id) return;
+
+      cleanupSharedGames();
+
+      let shared = JSON.parse(localStorage.getItem("sharedGames") || "[]");
+      const game = shared.find(g => g.id === id);
+
+      if (game) {
+        image = game.image;
+        config = game.config || { type: "puzzle", size: 3 };
+        size = config.size || 3;
+        localStorage.setItem("tempImage", image);
+        persistConfig();
+      } else {
+        alert("This shared puzzle has expired ⏳");
+      }
+    }
+
+    function buildPuzzle() {
+      puzzleSolved = false;
+      winEl.style.display = "none";
+      removeBadge();
+
+      board.innerHTML = "";
+      board.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+      board.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+
+      const total = size * size;
+      const order = [...Array(total).keys()];
+
+      // Fisher-Yates
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+
+      // undvik redan löst
+      if (order.every((v, i) => v === i) && order.length > 1) {
+        [order[0], order[1]] = [order[1], order[0]];
+      }
+
+      const pieces = [];
+
+      for (let i = 0; i < total; i++) {
+        const correctIndex = i;
+        const posX = (correctIndex % size);
+        const posY = Math.floor(correctIndex / size);
+
+        const piece = document.createElement("div");
+        piece.className = "puzzle-piece";
+        piece.draggable = true;
+        piece.dataset.correct = String(correctIndex);
+
+        piece.style.backgroundImage = `url("${image}")`;
+        piece.style.backgroundSize = `${size * 100}% ${size * 100}%`;
+        piece.style.backgroundPosition =
+          `${(posX * 100) / (Math.max(size - 1, 1))}% ${(posY * 100) / (Math.max(size - 1, 1))}%`;
+
+        pieces.push(piece);
+      }
+
+      const frag = document.createDocumentFragment();
+      order.forEach(idx => frag.appendChild(pieces[idx]));
+      board.appendChild(frag);
+
+      enableDnD();
+      setActiveChip();
+    }
+
+    function enableDnD() {
+      let dragged = null;
+      let hoverEl = null;
+
+      // Desktop DnD
+      board.addEventListener("dragstart", onDragStart);
+      board.addEventListener("dragend", onDragEnd);
+      board.addEventListener("dragover", onDragOver);
+      board.addEventListener("dragleave", onDragLeave);
+      board.addEventListener("drop", onDrop);
+
+      function onDragStart(e) {
+        const el = e.target;
+        if (!el.classList.contains("puzzle-piece")) return;
+        dragged = el;
+        dragged.classList.add("dragging");
+      }
+
+      function onDragEnd() {
+        if (dragged) dragged.classList.remove("dragging");
+        dragged = null;
+        if (hoverEl) {
+          hoverEl.classList.remove("hover-target");
+          hoverEl = null;
+        }
+      }
+
+      function onDragOver(e) {
+        e.preventDefault();
+        const t = e.target;
+        if (!t.classList.contains("puzzle-piece") || t === dragged) return;
+
+        if (hoverEl && hoverEl !== t) hoverEl.classList.remove("hover-target");
+        hoverEl = t;
+        hoverEl.classList.add("hover-target");
+      }
+
+      function onDragLeave(e) {
+        const t = e.target;
+        if (t === hoverEl) {
+          t.classList.remove("hover-target");
+          hoverEl = null;
+        }
+      }
+
+      function onDrop(e) {
+        e.preventDefault();
+        const t = e.target;
+        if (!dragged || !t.classList.contains("puzzle-piece") || dragged === t) return;
+
+        swapPieces(dragged, t);
+        maybeWin();
+      }
+
+      // Touch drag
+      Array.from(board.querySelectorAll(".puzzle-piece")).forEach(piece => enableTouchDrag(piece));
+
+      function enableTouchDrag(piece) {
+        let clone = null;
+        let currentHover = null;
+        let startW = 0;
+        let startH = 0;
+
+        piece.addEventListener("touchstart", e => {
+          const t = e.touches[0];
+          startW = piece.offsetWidth;
+          startH = piece.offsetHeight;
+
+          clone = piece.cloneNode(true);
+          Object.assign(clone.style, {
+            position: "fixed",
+            left: `${t.clientX - startW / 2}px`,
+            top: `${t.clientY - startH / 2}px`,
+            width: `${startW}px`,
+            height: `${startH}px`,
+            zIndex: 1000,
+            opacity: 0.92,
+            pointerEvents: "none",
+            border: "2px solid rgba(255,255,255,.25)"
+          });
+          clone.classList.add("drag-clone");
+          document.body.appendChild(clone);
+          piece.classList.add("dragging");
+        }, { passive: true });
+
+        piece.addEventListener("touchmove", e => {
+          e.preventDefault();
+          const t = e.touches[0];
+
+          if (clone) {
+            clone.style.left = `${t.clientX - startW / 2}px`;
+            clone.style.top = `${t.clientY - startH / 2}px`;
+          }
+
+          const target = document.elementFromPoint(t.clientX, t.clientY);
+
+          if (target && target.classList.contains("puzzle-piece") && target !== piece) {
+            if (currentHover && currentHover !== target) {
+              currentHover.classList.remove("hover-target");
+            }
+            currentHover = target;
+            currentHover.classList.add("hover-target");
+          } else if (currentHover) {
+            currentHover.classList.remove("hover-target");
+            currentHover = null;
+          }
+        }, { passive: false });
+
+        piece.addEventListener("touchend", () => {
+          if (clone) {
+            clone.remove();
+            clone = null;
+          }
+
+          piece.classList.remove("dragging");
+
+          if (currentHover) {
+            swapPieces(piece, currentHover);
+            currentHover.classList.remove("hover-target");
+            currentHover = null;
+            maybeWin();
+          }
+        }, { passive: true });
+      }
+    }
+
+    function swapPieces(a, b) {
+      const kids = Array.from(board.children);
+      const ia = kids.indexOf(a);
+      const ib = kids.indexOf(b);
+      if (ia < 0 || ib < 0) return;
+
+      if (ia < ib) {
+        board.insertBefore(a, b.nextSibling);
+        board.insertBefore(b, board.children[ia]);
+      } else {
+        board.insertBefore(b, a.nextSibling);
+        board.insertBefore(a, board.children[ib]);
+      }
+
+      a.classList.remove("dragging");
+      b.classList.remove("dragging");
+      a.classList.remove("hover-target");
+      b.classList.remove("hover-target");
+    }
+
+    function maybeWin() {
+      if (puzzleSolved) return;
+
+      const kids = Array.from(board.children);
+      const ok = kids.every((el, i) => String(i) === el.dataset.correct);
+
+      if (!ok) return;
+
+      puzzleSolved = true;
+      winEl.style.display = "block";
+
+      board.animate(
+        [
+          { transform: "scale(1)" },
+          { transform: "scale(1.03)" },
+          { transform: "scale(1)" }
+        ],
+        { duration: 420 }
+      );
+
+      showBadge();
+    }
+
+    function showBadge() {
+      removeBadge();
+
+      const badge = document.createElement("div");
+      badge.className = "win-badge";
+      badge.id = "winBadge";
+      badge.textContent = "KLAR! ✨";
+
+      boardWrap.appendChild(badge);
+
+      setTimeout(() => {
+        removeBadge();
+      }, 1600);
+    }
+
+    function removeBadge() {
+      const badge = document.getElementById("winBadge");
+      if (badge) badge.remove();
+    }
+
+    function restart() {
+      buildPuzzle();
+    }
+
+    function getGames() {
+      return JSON.parse(localStorage.getItem("games") || "[]");
+    }
+
+    function saveGame() {
+      let games = getGames();
+
+      if (games.length >= FREE_LIMIT) {
+        alert("You reached the free limit of 3 saved games. Premium coming soon 😄");
+        return;
+      }
+
+      games.push({
+        id: Date.now().toString(),
+        image,
+        config: { type: "puzzle", size },
+        createdAt: Date.now()
+      });
+
+      localStorage.setItem("games", JSON.stringify(games));
+      alert("Saved to Challenges!");
+    }
+
+    function shareGame() {
+      cleanupSharedGames();
+
+      const id = Date.now().toString();
+      let shared = JSON.parse(localStorage.getItem("sharedGames") || "[]");
+
+      shared.push({
+        id,
+        image,
+        config: { type: "puzzle", size },
+        createdAt: Date.now()
+      });
+
+      localStorage.setItem("sharedGames", JSON.stringify(shared));
+
+      const link = `${window.location.origin}${window.location.pathname}?share=${id}`;
+      const shareText = `Try my puzzle! 😄 ${link}`;
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(link).catch(() => {});
+      }
+
+      if (navigator.share) {
+        navigator.share({
+          title: "Snap2Play",
+          text: "Try my puzzle! 😄",
+          url: link
+        }).catch(() => {
+          fallbackShare(shareText, link);
+        });
+      } else {
+        fallbackShare(shareText, link);
+      }
+    }
+
+    function fallbackShare(shareText, link) {
+      const smsLink = `sms:?&body=${encodeURIComponent(shareText)}`;
+      const useSms = confirm(
+        "Sharing is limited in local preview.\n\nPress OK to open SMS, or Cancel to copy/show the link."
+      );
+
+      if (useSms) {
+        window.location.href = smsLink;
+      } else {
+        prompt("Copy this link:", link);
+      }
+    }
+
+    loadShared();
+
+    if (!image) {
+      window.location = "index.html";
+    } else {
+      buildPuzzle();
+    }
+  </script>
+</body>
+</html>
