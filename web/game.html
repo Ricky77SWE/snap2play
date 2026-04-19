@@ -20,13 +20,109 @@
       position: relative;
       z-index: 1;
       min-height: 100vh;
-      padding-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      padding:
+        calc(env(safe-area-inset-top, 0px) + 12px)
+        12px
+        calc(env(safe-area-inset-bottom, 0px) + 18px);
+      box-sizing: border-box;
+    }
+
+    .game-header {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      min-height: 56px;
+      margin-bottom: 4px;
+      flex: 0 0 auto;
+    }
+
+    .game-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+
+    .mode-note {
+      margin: 0 0 8px;
+      padding: 8px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.14);
+      backdrop-filter: blur(8px);
+      font-size: 14px;
+      font-weight: 800;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.16);
+      display: none;
+    }
+
+    .diff-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+      margin: 0 0 10px;
+      padding: 0 4px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .diff-chip {
+      padding: 8px 10px;
+      min-width: 50px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.16);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 10px rgba(255,255,255,0.08);
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+      transition: transform 0.1s ease, background 0.12s ease, opacity 0.12s ease;
+      user-select: none;
+    }
+
+    @media (max-width: 430px) {
+      .diff-chip {
+        padding: 7px 8px;
+        min-width: 46px;
+        font-size: 12px;
+        border-radius: 11px;
+      }
+
+      .diff-row {
+        gap: 5px;
+      }
+    }
+
+
+    .diff-chip:active {
+      transform: scale(0.96);
+    }
+
+    .diff-chip.active {
+      background: rgba(255, 196, 0, 0.92);
+      color: #1a1a1a;
+    }
+
+    .diff-chip.locked {
+      opacity: 0.55;
+    }
+
+    .diff-chip.challenge-disabled {
+      opacity: 0.38;
+      cursor: default;
     }
 
     .board-wrap {
       width: min(92vw, 520px);
-      margin: 14px auto 0;
+      margin: 0 auto;
       position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .board {
@@ -54,13 +150,17 @@
       padding: 0;
       border-radius: 16px;
       background: transparent;
-      box-shadow: 0 18px 42px rgba(0,0,0,0.28), 0 0 24px rgba(255,255,255,0.18);
-      animation: solvedFlash 0.55s ease;
+      box-shadow:
+        0 18px 42px rgba(0,0,0,0.28),
+        0 0 28px rgba(255,255,255,0.18),
+        0 0 38px rgba(120,220,255,0.12);
+      animation: solvedFlash 0.8s ease;
     }
 
     @keyframes solvedFlash {
       0%   { filter: brightness(1); transform: scale(1); }
-      35%  { filter: brightness(1.25); transform: scale(1.015); }
+      30%  { filter: brightness(1.18); transform: scale(1.01); }
+      60%  { filter: brightness(1.10); transform: scale(1.006); }
       100% { filter: brightness(1); transform: scale(1); }
     }
 
@@ -75,36 +175,35 @@
         linear-gradient(
           115deg,
           rgba(255,255,255,0) 0%,
-          rgba(255,255,255,0.0) 30%,
-          rgba(255,255,255,0.55) 48%,
-          rgba(255,255,255,0.0) 64%,
+          rgba(255,255,255,0.0) 28%,
+          rgba(255,255,255,0.58) 48%,
+          rgba(255,255,255,0.0) 68%,
           rgba(255,255,255,0) 100%
         );
-      transform: translateX(-130%);
+      transform: translateX(-135%);
     }
 
     .board-shimmer.run {
-      animation: shimmerSweep 1s ease forwards;
+      animation: shimmerSweep 1.55s ease forwards;
     }
 
     @keyframes shimmerSweep {
       0% {
         opacity: 0;
-        transform: translateX(-130%);
+        transform: translateX(-135%);
       }
-      12% {
+      10% {
         opacity: 1;
       }
       100% {
         opacity: 1;
-        transform: translateX(130%);
+        transform: translateX(135%);
       }
     }
 
     .puzzle-piece {
       position: relative;
       width: 100%;
-      aspect-ratio: 1 / 1;
       border-radius: 10px;
       overflow: hidden;
       background-repeat: no-repeat;
@@ -150,30 +249,99 @@
       position: relative;
       z-index: 2;
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(14px) scale(0.98);
+      text-align: center;
     }
 
     .win.show {
       display: block;
-      animation: revealWin 0.45s ease forwards;
+      animation: revealWin 0.55s ease forwards;
     }
 
     @keyframes revealWin {
       0% {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(14px) scale(0.98);
       }
       100% {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
       }
     }
 
     .win-title {
-      font-size: 28px;
+      font-size: 34px;
       font-weight: 900;
-      text-shadow: 0 3px 12px rgba(0,0,0,0.3);
+      line-height: 1.05;
+      text-shadow: 0 4px 14px rgba(0,0,0,0.32);
       margin-bottom: 8px;
+    }
+
+    .win-subtitle {
+      font-size: 15px;
+      font-weight: 700;
+      opacity: 0.92;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.28);
+      margin-bottom: 10px;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 14px 14px 10px;
+    }
+
+    .action-btn {
+      min-width: 158px;
+      min-height: 66px;
+      padding: 14px 18px;
+      border: 0;
+      border-radius: 22px;
+      font-size: 18px;
+      font-weight: 900;
+      color: white;
+      cursor: pointer;
+      transition: transform 0.12s ease, filter 0.12s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow:
+        0 12px 26px rgba(0,0,0,0.22),
+        0 0 14px rgba(255,255,255,0.08);
+    }
+
+    .action-btn .icon {
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(180deg, #ffc93c, #ff8b00);
+      box-shadow:
+        0 12px 26px rgba(0,0,0,0.22),
+        0 0 16px rgba(255,181,0,0.35);
+    }
+
+    .action-btn.secondary {
+      background: linear-gradient(180deg, #62c7ff, #2f66e8);
+      box-shadow:
+        0 12px 26px rgba(0,0,0,0.22),
+        0 0 16px rgba(105,189,255,0.28);
+    }
+
+    .action-btn.tertiary {
+      background: linear-gradient(180deg, #7bc7ff, #4b87ff);
+      box-shadow:
+        0 12px 26px rgba(0,0,0,0.22),
+        0 0 16px rgba(125,190,255,0.22);
+    }
+
+    .action-btn:active {
+      transform: scale(0.96);
+      filter: brightness(1.06);
     }
 
     .stats {
@@ -181,33 +349,18 @@
       justify-content: center;
       gap: 12px;
       flex-wrap: wrap;
-      margin: 10px 14px 0;
+      margin: 12px 14px 0;
     }
 
     .stat-pill {
-      padding: 10px 14px;
-      border-radius: 14px;
+      padding: 12px 16px;
+      border-radius: 16px;
       background: rgba(255,255,255,0.16);
       backdrop-filter: blur(8px);
-      font-weight: 800;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
-      min-width: 110px;
-    }
-
-    .win-badge {
-      position: absolute;
-      left: 50%;
-      bottom: 16px;
-      transform: translateX(-50%);
-      width: fit-content;
-      padding: 10px 14px;
-      border-radius: 14px;
-      background: linear-gradient(90deg,#22c55e,#a3e635);
-      color: #0b1022;
       font-weight: 900;
-      letter-spacing: .4px;
-      z-index: 5;
-      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+      font-size: 17px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+      min-width: 128px;
     }
 
     @media (orientation: landscape) {
@@ -215,47 +368,88 @@
         overflow-y: auto;
       }
 
+      .game-wrap {
+        padding:
+          calc(env(safe-area-inset-top, 0px) + 8px)
+          16px
+          calc(env(safe-area-inset-bottom, 0px) + 12px);
+      }
+
+      .game-header {
+        min-height: 48px;
+        margin-bottom: 0;
+      }
+
+      .game-main {
+        justify-content: center;
+      }
+
+      .diff-row {
+        margin-bottom: 8px;
+      }
+
       .board-wrap {
-        width: min(62vh, 520px);
+        width: min(70vw, 920px);
+      }
+
+      .board {
+        max-height: 62vh;
+      }
+
+      .action-btn {
+        min-width: 150px;
+        min-height: 62px;
+        font-size: 17px;
+      }
+
+      .win-title {
+        font-size: 30px;
       }
     }
   </style>
 </head>
 <body>
   <div class="page game-wrap">
-    <div class="top-bar">
+    <div class="game-header">
       <div class="back-btn" onclick="goBack()">←</div>
-      <div class="top-title">Puzzle</div>
-      <div style="width:50px;"></div>
     </div>
 
-    <div class="diff-row">
-      <div id="chip-3" class="diff-chip active" onclick="setSize(3)">3x3</div>
-      <div id="chip-4" class="diff-chip" onclick="setSize(4)">4x4</div>
-      <div class="diff-chip locked" onclick="premium()">5x5 🔒</div>
-      <div class="diff-chip locked" onclick="premium()">6x6 🔒</div>
-    </div>
+    <div class="game-main">
+      <div class="mode-note" id="modeNote"></div>
+      <div class="diff-row" id="diffRow"></div>
 
-    <div class="board-wrap" id="boardWrap">
-      <div id="board" class="board"></div>
-      <div id="boardShimmer" class="board-shimmer"></div>
-    </div>
-
-    <div class="win" id="win">
-      <div class="win-title">🎉 Great job!</div>
-
-      <div class="actions">
-        <button class="action-btn secondary" onclick="saveGame()">💾 Save</button>
-        <button class="action-btn" onclick="shareGame()">🚀 Challenge</button>
+      <div class="board-wrap" id="boardWrap">
+        <div id="board" class="board"></div>
+        <div id="boardShimmer" class="board-shimmer"></div>
       </div>
 
-      <div class="actions">
-        <button class="action-btn secondary" onclick="restart()">Play Again</button>
-      </div>
+      <div class="win" id="win">
+        <div class="win-title">🎉 Great job!</div>
+        <div class="win-subtitle">You solved the puzzle!</div>
 
-      <div class="stats">
-        <div class="stat-pill" id="movesStat">Moves: 0</div>
-        <div class="stat-pill" id="timeStat">Time: 0s</div>
+        <div class="actions">
+          <button class="action-btn secondary" onclick="saveGame()">
+            <span class="icon">💾</span>
+            <span>Save</span>
+          </button>
+
+          <button class="action-btn primary" onclick="shareGame()">
+            <span class="icon">🚀</span>
+            <span>Challenge</span>
+          </button>
+        </div>
+
+        <div class="actions">
+          <button class="action-btn tertiary" onclick="restart()">
+            <span class="icon">🔄</span>
+            <span>Play Again</span>
+          </button>
+        </div>
+
+        <div class="stats">
+          <div class="stat-pill" id="movesStat">Moves: 0</div>
+          <div class="stat-pill" id="timeStat">Time: 0s</div>
+        </div>
       </div>
     </div>
   </div>
@@ -263,6 +457,17 @@
   <script>
     const FREE_LIMIT = 3;
     const SHARE_LIFETIME = 24 * 60 * 60 * 1000;
+
+    const SIZE_LEVELS = [2, 3, 4, 5, 6, 7, 8];
+    const UNLOCK_REQUIREMENTS = {
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 5,
+      6: 15,
+      7: 35,
+      8: 60
+    };
 
     let image = localStorage.getItem("tempImage");
     let config = JSON.parse(localStorage.getItem("gameConfig") || '{"type":"puzzle","size":3}');
@@ -274,27 +479,107 @@
     const winEl = document.getElementById("win");
     const movesStatEl = document.getElementById("movesStat");
     const timeStatEl = document.getElementById("timeStat");
+    const diffRowEl = document.getElementById("diffRow");
+    const modeNoteEl = document.getElementById("modeNote");
+    const imageMeta = JSON.parse(localStorage.getItem("tempImageMeta") || '{"width":1,"height":1}');
 
     let puzzleSolved = false;
     let moves = 0;
     let startTime = 0;
     let elapsedSeconds = 0;
     let timerInterval = null;
+    let winCounted = false;
+
+    let challengeMode = false;
+    let challengeLockedSize = null;
+
+    function getProfileStats() {
+      return JSON.parse(localStorage.getItem("profileStats") || '{"completedCount":0}');
+    }
+
+    function saveProfileStats(stats) {
+      localStorage.setItem("profileStats", JSON.stringify(stats));
+    }
+
+    function incrementCompletedCountOnce() {
+      if (winCounted) return;
+      winCounted = true;
+      const stats = getProfileStats();
+      stats.completedCount = Number(stats.completedCount || 0) + 1;
+      saveProfileStats(stats);
+    }
+
+    function getCompletedCount() {
+      return Number(getProfileStats().completedCount || 0);
+    }
+
+    function isSizeUnlocked(targetSize) {
+      if (challengeMode && targetSize === challengeLockedSize) return true;
+      return getCompletedCount() >= (UNLOCK_REQUIREMENTS[targetSize] || 0);
+    }
+
+    function isChallengeSharedGame() {
+      const params = new URLSearchParams(location.search);
+      return params.has("share");
+    }
 
     function persistConfig() {
       localStorage.setItem("gameConfig", JSON.stringify({ type: "puzzle", size }));
     }
 
-    function setActiveChip() {
-      document.querySelectorAll(".diff-chip").forEach(chip => chip.classList.remove("active"));
-      const active = document.getElementById(`chip-${size}`);
-      if (active) active.classList.add("active");
+    function renderModeNote() {
+      if (challengeMode) {
+        modeNoteEl.style.display = "block";
+        modeNoteEl.textContent = `Challenge mode • ${size}x${size} locked`;
+      } else {
+        modeNoteEl.style.display = "none";
+        modeNoteEl.textContent = "";
+      }
+    }
+
+    function renderDifficultyChips() {
+      diffRowEl.innerHTML = "";
+
+      SIZE_LEVELS.forEach(level => {
+        const chip = document.createElement("div");
+        chip.className = "diff-chip";
+        chip.textContent = `${level}x${level}`;
+
+        if (level === size) {
+          chip.classList.add("active");
+        }
+
+        if (challengeMode) {
+          if (level !== challengeLockedSize) {
+            chip.classList.add("challenge-disabled");
+          }
+        } else {
+          const unlocked = isSizeUnlocked(level);
+          if (!unlocked) {
+            chip.classList.add("locked");
+            chip.textContent = `${level}x${level} 🔒`;
+          }
+        }
+
+        chip.onclick = () => setSize(level);
+        diffRowEl.appendChild(chip);
+      });
     }
 
     function setSize(newSize) {
+      if (challengeMode) return;
+
+      if (!isSizeUnlocked(newSize)) {
+        const needed = UNLOCK_REQUIREMENTS[newSize] || 0;
+        const current = getCompletedCount();
+        const left = Math.max(0, needed - current);
+        alert(`Finish ${left} more puzzle${left === 1 ? "" : "s"} to unlock ${newSize}x${newSize}.`);
+        return;
+      }
+
       size = newSize;
       persistConfig();
-      setActiveChip();
+      renderDifficultyChips();
       restart();
     }
 
@@ -328,6 +613,8 @@
         image = game.image;
         config = game.config || { type: "puzzle", size: 3 };
         size = config.size || 3;
+        challengeMode = true;
+        challengeLockedSize = size;
         localStorage.setItem("tempImage", image);
         persistConfig();
       } else {
@@ -357,13 +644,38 @@
       elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
     }
 
+    function applyBoardAspect() {
+      const ratio = imageMeta.width / imageMeta.height;
+
+      boardWrap.style.width = "min(92vw, 520px)";
+      board.style.width = "100%";
+      board.style.aspectRatio = `${imageMeta.width} / ${imageMeta.height}`;
+      board.style.height = "auto";
+
+      if (ratio > 1.4) {
+        board.style.maxHeight = "60vh";
+      } else if (ratio < 0.8) {
+        board.style.maxHeight = "70vh";
+      } else {
+        board.style.maxHeight = "";
+      }
+
+      if (window.matchMedia("(orientation: landscape)").matches) {
+        boardWrap.style.width = "min(70vw, 920px)";
+      }
+    }
+
     function buildPuzzle() {
       puzzleSolved = false;
+      winCounted = false;
+      applyBoardAspect();
+      renderModeNote();
+      renderDifficultyChips();
+
       winEl.classList.remove("show");
       winEl.style.display = "none";
       board.classList.remove("puzzle-complete");
       boardShimmer.classList.remove("run");
-      removeBadge();
       resetStats();
 
       board.innerHTML = "";
@@ -407,7 +719,6 @@
       board.appendChild(frag);
 
       enableDnD();
-      setActiveChip();
     }
 
     function enableDnD() {
@@ -571,6 +882,7 @@
 
       puzzleSolved = true;
       stopTimer();
+      incrementCompletedCountOnce();
 
       movesStatEl.textContent = `Moves: ${moves}`;
       timeStatEl.textContent = `Time: ${formatTime(elapsedSeconds)}`;
@@ -580,26 +892,32 @@
       board.animate(
         [
           { transform: "scale(1)" },
-          { transform: "scale(1.025)" },
+          { transform: "scale(1.018)" },
           { transform: "scale(1)" }
         ],
-        { duration: 420 }
+        { duration: 650 }
       );
 
-      showBadge();
-
-      setTimeout(() => {
-        boardShimmer.classList.remove("run");
-        void boardShimmer.offsetWidth;
-        boardShimmer.classList.add("run");
-      }, 120);
+      runVictoryShimmerSequence();
 
       setTimeout(() => {
         winEl.style.display = "block";
         requestAnimationFrame(() => {
           winEl.classList.add("show");
         });
-      }, 850);
+      }, 1900);
+    }
+
+    function runVictoryShimmerSequence() {
+      boardShimmer.classList.remove("run");
+      void boardShimmer.offsetWidth;
+      boardShimmer.classList.add("run");
+
+      setTimeout(() => {
+        boardShimmer.classList.remove("run");
+        void boardShimmer.offsetWidth;
+        boardShimmer.classList.add("run");
+      }, 900);
     }
 
     function formatTime(totalSeconds) {
@@ -607,26 +925,6 @@
       const secs = totalSeconds % 60;
       if (mins <= 0) return `${secs}s`;
       return `${mins}m ${secs}s`;
-    }
-
-    function showBadge() {
-      removeBadge();
-
-      const badge = document.createElement("div");
-      badge.className = "win-badge";
-      badge.id = "winBadge";
-      badge.textContent = "KLAR! ✨";
-
-      boardWrap.appendChild(badge);
-
-      setTimeout(() => {
-        removeBadge();
-      }, 1600);
-    }
-
-    function removeBadge() {
-      const badge = document.getElementById("winBadge");
-      if (badge) badge.remove();
     }
 
     function restart() {
@@ -676,7 +974,7 @@
       localStorage.setItem("sharedGames", JSON.stringify(shared));
 
       const link = `${window.location.origin}${window.location.pathname}?share=${id}`;
-      const shareText = `Try my puzzle! 😄 ${link}`;
+      const shareText = `Try my ${size}x${size} puzzle! 😄 ${link}`;
 
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(link).catch(() => {});
@@ -685,7 +983,7 @@
       if (navigator.share) {
         navigator.share({
           title: "Snap2Play",
-          text: "Try my puzzle! 😄",
+          text: `Try my ${size}x${size} puzzle! 😄`,
           url: link
         }).catch(() => {
           fallbackShare(shareText, link);
@@ -715,6 +1013,8 @@
     } else {
       buildPuzzle();
     }
+
+    window.addEventListener("resize", applyBoardAspect);
   </script>
 </body>
 </html>

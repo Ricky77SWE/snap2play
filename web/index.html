@@ -10,47 +10,98 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: space-between;
       min-height: 100vh;
-      padding: 26px 18px 36px;
+      padding: 18px 18px 24px;
+      box-sizing: border-box;
       position: relative;
       z-index: 1;
     }
 
     .home-top {
       width: 100%;
-      display: flex;
-      justify-content: flex-end;
+      min-height: 8px;
+      flex: 0 0 auto;
     }
 
     .home-center {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .tagline {
+      font-size: 17px;
+      font-weight: 800;
+      opacity: 0.96;
+      margin: 0 0 8px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      letter-spacing: 0.2px;
+    }
+
+    .home-main-row {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 14px;
-      margin-top: -10px;
       width: 100%;
-    }
-
-    .home-actions {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-      width: 100%;
+      margin-top: 4px;
     }
 
     .home-bottom {
+      width: 100%;
       display: flex;
       justify-content: center;
-      margin-bottom: 6px;
+      margin-top: 14px;
+      flex: 0 0 auto;
     }
 
-    .settings-gear {
-      font-size: 28px;
-      text-shadow: 0 3px 10px rgba(0,0,0,0.3);
-      opacity: 0.92;
+    .challenge-btn-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    @media (orientation: landscape) {
+      .home-layout {
+        padding: 10px 18px 14px;
+      }
+
+      .home-center {
+        gap: 6px;
+      }
+
+      .tagline {
+        margin-bottom: 4px;
+      }
+
+      .home-main-row {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 18px;
+        width: auto;
+      }
+
+      .home-bottom {
+        display: none;
+      }
+
+      .challenge-btn-wrap.landscape-inline {
+        display: flex;
+      }
+    }
+
+    @media (orientation: portrait) {
+      .challenge-btn-wrap.landscape-inline {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -60,81 +111,112 @@
 
     <div class="home-center">
       <img src="assets/logo.png" class="logo" alt="Snap2Play logo">
+      <div class="tagline">Create. Play. Share.</div>
 
-      <div class="home-actions">
-        <label class="img-btn">
-          <img src="assets/btn_camera.png" class="btn-primary" alt="Take Photo">
-          <input id="cameraInput" class="hidden-input" type="file" accept="image/*" capture="environment">
-        </label>
+      <div class="home-main-row">
+        <div class="square-action square-camera img-btn" onclick="openCamera()" role="button" aria-label="Take Photo">
+          <img src="assets/btn_camera_square.png" class="square-action-image" alt="Take Photo">
+        </div>
 
-        <label class="img-btn">
-          <img src="assets/btn_gallery.png" class="btn-primary" alt="Choose Image">
-          <input id="galleryInput" class="hidden-input" type="file" accept="image/*">
-        </label>
+        <div class="square-action square-gallery img-btn" onclick="openGallery()" role="button" aria-label="Choose Image">
+          <img src="assets/btn_gallery_square.png" class="square-action-image" alt="Choose Image">
+        </div>
+
+        <div class="challenge-btn-wrap landscape-inline" onclick="goLibrary()" aria-label="Open Challenges">
+          <img src="assets/btn_challenges_square.png" class="square-action-image square-challenges" alt="Challenges">
+        </div>
       </div>
     </div>
 
     <div class="home-bottom">
-      <img src="assets/btn_secondary.png" class="btn-small img-btn" alt="Challenges" onclick="goLibrary()">
+      <div class="challenge-btn-wrap" onclick="goLibrary()" aria-label="Open Challenges">
+        <img src="assets/btn_challenges_square.png" class="square-action-image square-challenges" alt="Challenges">
+      </div>
     </div>
   </div>
 
   <script>
-    document.getElementById("cameraInput").addEventListener("change", handleImage);
-    document.getElementById("galleryInput").addEventListener("change", handleImage);
+    async function openCamera() {
+      try {
+        const CameraPlugin = window.Capacitor?.Plugins?.Camera;
+        if (!CameraPlugin) {
+          alert("Camera plugin not available");
+          return;
+        }
 
-    function compressImageToDataUrl(file, callback) {
-      const reader = new FileReader();
+        const result = await CameraPlugin.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: "uri",
+          source: "CAMERA",
+          saveToGallery: false,
+          correctOrientation: true
+        });
 
-      reader.onload = function (ev) {
-        const img = new Image();
-
-        img.onload = function () {
-          const canvas = document.createElement("canvas");
-          const max = 512;
-
-          let w = img.width;
-          let h = img.height;
-
-          if (w > h) {
-            if (w > max) {
-              h *= max / w;
-              w = max;
-            }
-          } else {
-            if (h > max) {
-              w *= max / h;
-              h = max;
-            }
-          }
-
-          canvas.width = Math.round(w);
-          canvas.height = Math.round(h);
-
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-          const compressed = canvas.toDataURL("image/jpeg", 0.7);
-          callback(compressed);
-        };
-
-        img.src = ev.target.result;
-      };
-
-      reader.readAsDataURL(file);
+        if (!result || !result.webPath) return;
+        await handlePickedImage(result.webPath);
+      } catch (err) {
+        console.error("openCamera failed", err);
+      }
     }
 
-    function handleImage(e) {
-      const file = e.target.files[0];
-      if (!file) return;
+    async function openGallery() {
+      try {
+        const CameraPlugin = window.Capacitor?.Plugins?.Camera;
+        if (!CameraPlugin) {
+          alert("Camera plugin not available");
+          return;
+        }
 
-      compressImageToDataUrl(file, function (compressed) {
+        const result = await CameraPlugin.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: "uri",
+          source: "PHOTOS",
+          correctOrientation: true
+        });
+
+        if (!result || !result.webPath) return;
+        await handlePickedImage(result.webPath);
+      } catch (err) {
+        console.error("openGallery failed", err);
+      }
+    }
+
+    async function handlePickedImage(webPath) {
+      const img = new Image();
+
+      img.onload = function () {
+        const canvas = document.createElement("canvas");
+        const max = 1600;
+
+        let w = img.width;
+        let h = img.height;
+
+        const scale = Math.min(1, max / Math.max(w, h));
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+
+        canvas.width = w;
+        canvas.height = h;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const compressed = canvas.toDataURL("image/jpeg", 0.88);
+
         localStorage.setItem("tempImage", compressed);
+        localStorage.setItem("tempImageMeta", JSON.stringify({ width: w, height: h }));
         localStorage.setItem("gameConfig", JSON.stringify({ type: "puzzle", size: 3 }));
-        window.location = "game.html";
-      });
 
-      e.target.value = "";
+        window.location = "game.html";
+      };
+
+      img.onerror = function (e) {
+        console.error("Image load failed", e);
+      };
+
+      img.src = webPath;
     }
 
     function goLibrary() {

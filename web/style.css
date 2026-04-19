@@ -53,7 +53,7 @@ body::after {
   width: min(300px, 72vw);
   max-width: 300px;
   display: block;
-  margin: 10px auto 10px;
+  margin: 8px auto 6px;
   filter: drop-shadow(0 0 18px rgba(255,255,255,0.18));
 }
 
@@ -78,7 +78,7 @@ body::after {
 }
 
 .btn-secondary-large {
-  width: min(350px, 84vw);
+  width: min(300px, 78vw);
   display: block;
   filter: drop-shadow(0 0 10px rgba(110, 210, 255, 0.7));
 }
@@ -93,6 +93,39 @@ body::after {
   0% { transform: scale(1); }
   50% { transform: scale(1.045); }
   100% { transform: scale(1); }
+}
+
+/* square actions */
+.square-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.square-action-image {
+  width: min(210px, 42vw);
+  display: block;
+  filter: drop-shadow(0 0 16px rgba(255,255,255,0.14));
+  transition: transform 0.14s ease, filter 0.14s ease;
+}
+
+.square-camera .square-action-image {
+  animation: pulse 2s infinite;
+  filter: drop-shadow(0 0 14px rgba(255, 190, 0, 0.85));
+}
+
+.square-gallery .square-action-image {
+  filter: drop-shadow(0 0 12px rgba(110, 210, 255, 0.55));
+}
+
+.square-challenges {
+  filter: drop-shadow(0 0 14px rgba(120, 180, 255, 0.35));
+}
+
+.challenge-btn-wrap:active .square-action-image,
+.square-action:active .square-action-image {
+  transform: scale(0.96);
+  filter: brightness(1.08);
 }
 
 /* round back */
@@ -310,8 +343,9 @@ body::after {
   }
 
   .logo {
-    width: min(250px, 38vw);
-    margin-top: 10px;
+    width: min(210px, 24vw);
+    margin-top: 2px;
+    margin-bottom: 2px;
   }
 
   .board {
@@ -322,13 +356,7 @@ body::after {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .home-actions {
-    flex-direction: row;
-    justify-content: center;
-    gap: 20px;
-  }
-
-  .btn-primary {
-    width: min(260px, 40vw);
+  .square-action-image {
+    width: min(180px, 19vw);
   }
 }
