@@ -222,6 +222,40 @@
     function goLibrary() {
       window.location = "library.html";
     }
+
+    function handleIncomingUrl(url) {
+      if (!url) return;
+
+      try {
+        const u = new URL(url);
+        let challengeId = u.searchParams.get("c");
+
+        if (!challengeId && u.protocol === "snap2play:" && u.hostname === "challenge") {
+          challengeId = u.searchParams.get("c");
+        }
+
+        if (challengeId) {
+          window.location.href = `game.html?c=${encodeURIComponent(challengeId)}`;
+        }
+      } catch (e) {
+        console.log("Could not parse incoming URL", e);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      if (window.Capacitor?.Plugins?.App) {
+        const App = window.Capacitor.Plugins.App;
+
+        App.addListener("appUrlOpen", (event) => {
+          handleIncomingUrl(event.url);
+        });
+
+        const launch = await App.getLaunchUrl();
+        if (launch?.url) {
+          handleIncomingUrl(launch.url);
+        }
+      }
+    });
   </script>
 </body>
 </html>

@@ -34,16 +34,42 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
+        print("DEEPLINK open url:", url.absoluteString)
+
+        if openChallengeFromUrl(url) {
+            return true
+        }
+
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        // Called when the app was launched with an activity, including Universal Links.
-        // Feel free to add additional processing here, but if you want the App API to support
-        // tracking app url opens, make sure to keep this call
+        print("DEEPLINK userActivity:", userActivity.webpageURL?.absoluteString ?? "nil")
+
+        if let url = userActivity.webpageURL, openChallengeFromUrl(url) {
+            return true
+        }
+
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    private func openChallengeFromUrl(_ url: URL) -> Bool {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let challengeId = components.queryItems?.first(where: { $0.name == "c" })?.value,
+              !challengeId.isEmpty else {
+            return false
+        }
+
+        let safeId = challengeId.replacingOccurrences(of: "'", with: "\\'")
+        let js = "window.location.href = 'game.html?c=\(safeId)';"
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            if let bridgeVC = self.window?.rootViewController as? CAPBridgeViewController {
+                bridgeVC.webView?.evaluateJavaScript(js, completionHandler: nil)
+            }
+        }
+
+        return true
+    }
+    
 }

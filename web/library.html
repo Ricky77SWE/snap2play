@@ -2,17 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Snap2Play - Challenges</title>
   <link rel="stylesheet" href="style.css">
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
   <style>
+    .card {
+      position: relative;
+      overflow: hidden;
+    }
+
     .card-stats {
       display: flex;
       justify-content: center;
       gap: 8px;
       flex-wrap: wrap;
-      padding: 0 10px 12px;
+      padding: 0 10px 8px;
     }
 
     .mini-stat {
@@ -24,6 +33,119 @@
       backdrop-filter: blur(6px);
       box-shadow: 0 6px 14px rgba(0,0,0,0.12);
     }
+
+    .card-actions {
+      display: flex;
+      gap: 7px;
+      padding: 0 10px 12px;
+      justify-content: center;
+    }
+
+    .mini-action {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      border-radius: 13px;
+      padding: 8px 6px;
+      font-size: 12px;
+      font-weight: 900;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+      transform: translateZ(0);
+    }
+
+    .mini-action:active {
+      transform: scale(0.96);
+      filter: brightness(1.08);
+    }
+
+    .mini-action.play {
+      background: linear-gradient(180deg, #7bc7ff, #4b87ff);
+    }
+
+    .mini-action.challenge {
+      background: linear-gradient(180deg, #ffc93c, #ff8b00);
+    }
+
+    .mini-action.delete {
+      background: linear-gradient(180deg, #ff6b6b, #ff2d55);
+      flex: 0 0 44px;
+      font-size: 15px;
+    }
+
+    .card-loading {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(6px);
+      font-size: 16px;
+      font-weight: 900;
+      z-index: 5;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .card.loading .card-loading {
+      display: flex;
+    }
+
+    .choice-modal {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 20px;
+      display: none;
+      z-index: 30;
+      padding: 18px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, #1c1f3f, #121426);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 20px rgba(120,180,255,0.2);
+      text-align: center;
+    }
+
+    .choice-title {
+      font-size: 22px;
+      font-weight: 900;
+      margin-bottom: 8px;
+      background: linear-gradient(90deg, #ffd84d, #ff7a00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .choice-text {
+      font-size: 15px;
+      opacity: 0.92;
+      margin-bottom: 14px;
+      line-height: 1.35;
+      white-space: pre-line;
+    }
+
+    .choice-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .choice-btn {
+      width: 100%;
+      border: 0;
+      border-radius: 18px;
+      min-height: 56px;
+      padding: 12px 16px;
+      font-size: 17px;
+      font-weight: 900;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 12px 26px rgba(0,0,0,0.22);
+    }
+
+    .choice-btn.primary { background: linear-gradient(180deg, #ffc93c, #ff8b00); }
+    .choice-btn.secondary { background: linear-gradient(180deg, #62c7ff, #2f66e8); }
+    .choice-btn.close { background: linear-gradient(180deg, #7d7d98, #4a4a68); }
   </style>
 </head>
 <body>
@@ -48,10 +170,32 @@
     </div>
   </div>
 
+  <div id="choiceModal" class="choice-modal">
+    <div class="choice-title" id="choiceTitle">Create challenge</div>
+    <div class="choice-text" id="choiceText">Choose how your friends should try to beat your result.</div>
+    <div class="choice-actions" id="choiceActions"></div>
+  </div>
+
   <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDDVRGbZ4m4RcKkVhMO0K2rPwAuNrinjuE",
+      authDomain: "snap2play-app.firebaseapp.com",
+      projectId: "snap2play-app",
+      storageBucket: "snap2play-app.firebasestorage.app",
+      messagingSenderId: "487938028395",
+      appId: "1:487938028395:web:250fd22871d1433b73522e",
+      measurementId: "G-994W82KCZS"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
     const FREE_LIMIT = 3;
-    const SHARE_LIFETIME = 24 * 60 * 60 * 1000;
-    const CLOUD_BASE_URL = "https://your-backend-url.com";
+    const CHALLENGE_LIFETIME_MS = 12 * 60 * 60 * 1000;
+
+    let selectedGame = null;
+    let selectedCard = null;
 
     function goBack() {
       window.location.href = "index.html";
@@ -61,20 +205,20 @@
       return JSON.parse(localStorage.getItem("games") || "[]");
     }
 
+    function setGames(games) {
+      localStorage.setItem("games", JSON.stringify(games));
+    }
+
     function showPaywall() {
       document.getElementById("paywall").style.display = "block";
     }
 
-    function upgrade() {
-      alert("Hook up Stripe / in-app purchase here 💰");
+    function hidePaywall() {
+      document.getElementById("paywall").style.display = "none";
     }
 
-    function cleanupSharedGames() {
-      let shared = JSON.parse(localStorage.getItem("sharedGames") || "[]");
-      const now = Date.now();
-
-      shared = shared.filter(g => now - g.createdAt < SHARE_LIFETIME);
-      localStorage.setItem("sharedGames", JSON.stringify(shared));
+    function upgrade() {
+      alert("Hook up App Store / Google Play in-app purchase here 💰");
     }
 
     function formatTime(totalSeconds) {
@@ -84,6 +228,138 @@
 
       if (mins <= 0) return `${rest}s`;
       return `${mins}m ${rest}s`;
+    }
+
+    function getPublicChallengeLink(id) {
+      return `https://snap2play-app.web.app/open.html?c=${id}`;
+    }
+
+    function playGame(game) {
+      localStorage.setItem("tempImage", game.image);
+      localStorage.setItem("gameConfig", JSON.stringify(game.config || { type: "puzzle", size: 3 }));
+      if (game.imageMeta) {
+        localStorage.setItem("tempImageMeta", JSON.stringify(game.imageMeta));
+      }
+      window.location.href = "game.html";
+    }
+
+    function deleteGame(gameId) {
+      const ok = confirm("Delete this saved puzzle?");
+      if (!ok) return;
+
+      const games = getGames().filter(g => g.id !== gameId);
+      setGames(games);
+      hidePaywall();
+      render();
+    }
+
+    function openChallengeChooser(game, cardEl) {
+      selectedGame = game;
+      selectedCard = cardEl;
+
+      const size = game?.config?.size || 3;
+      const movesLabel = typeof game.moves === "number" ? game.moves : "-";
+      const timeLabel = formatTime(game.time);
+
+      document.getElementById("choiceTitle").textContent = "Create challenge";
+      document.getElementById("choiceText").textContent = `Puzzle ${size}x${size}\nMoves: ${movesLabel} • Time: ${timeLabel}`;
+      document.getElementById("choiceActions").innerHTML = `
+        <button class="choice-btn primary" onclick="sendChallengeFromLibrary('time')">⏱️ Beat my time</button>
+        <button class="choice-btn secondary" onclick="sendChallengeFromLibrary('moves')">🧩 Beat my moves</button>
+        <button class="choice-btn close" onclick="hideChoiceModal()">Cancel</button>
+      `;
+      document.getElementById("choiceModal").style.display = "block";
+    }
+
+    function hideChoiceModal() {
+      document.getElementById("choiceModal").style.display = "none";
+      selectedGame = null;
+      selectedCard = null;
+    }
+
+    function setCardLoading(cardEl, isLoading) {
+      if (!cardEl) return;
+      cardEl.classList.toggle("loading", Boolean(isLoading));
+    }
+
+    async function uploadChallengeFromGame(game, modeValue) {
+      const id = Date.now().toString();
+      const createdAt = Date.now();
+      const expiresAt = createdAt + CHALLENGE_LIFETIME_MS;
+      const size = game?.config?.size || 3;
+      const moves = Number(game.moves || 0);
+      const time = Number(game.time || 0);
+      const imageMeta = game.imageMeta || { width: 1, height: 1 };
+
+      let imageUrl = game.image;
+
+      if (typeof imageUrl === "string" && imageUrl.startsWith("data:")) {
+        const ref = storage.ref().child(`challenges/${id}.jpg`);
+        await ref.putString(imageUrl, "data_url");
+        imageUrl = await ref.getDownloadURL();
+      }
+
+      await db.collection("challenges").doc(id).set({
+        imageUrl,
+        moves,
+        time,
+        size,
+        imageMeta,
+        createdAt,
+        expiresAt,
+        challengeRule: {
+          mode: modeValue,
+          target: modeValue === "time" ? time : moves
+        }
+      });
+
+      return id;
+    }
+
+    async function sendChallengeFromLibrary(modeValue) {
+      if (!selectedGame) return;
+
+      const game = selectedGame;
+      const cardEl = selectedCard;
+      hideChoiceModal();
+      setCardLoading(cardEl, true);
+
+      try {
+        const size = game?.config?.size || 3;
+        const moves = Number(game.moves || 0);
+        const time = Number(game.time || 0);
+        const id = await uploadChallengeFromGame(game, modeValue);
+        const link = getPublicChallengeLink(id);
+
+        const shareText = modeValue === "time"
+          ? `📸🧩 Snap2Play Challenge!\nCan you beat my ${size}x${size} puzzle in ${time}s?\nYou have 12h to do it 😜\nTap to play!`
+          : `📸🧩 Snap2Play Challenge!\nCan you solve my ${size}x${size} puzzle in ${moves} moves or less?\nYou have 12h to do it 😜\nTap to play!`;
+
+        setCardLoading(cardEl, false);
+
+        if (navigator.share) {
+          await navigator.share({
+            title: "Snap2Play Challenge",
+            text: shareText,
+            url: link
+          });
+        } else {
+          fallbackShare(shareText, link);
+        }
+      } catch (err) {
+        console.error("sendChallengeFromLibrary failed", err);
+        setCardLoading(cardEl, false);
+        alert(`Could not create challenge.\n\n${err.message || err}`);
+      }
+    }
+
+    function fallbackShare(shareText, link) {
+      const fullMessage = `${shareText}\n${link}`;
+      const smsLink = `sms:?&body=${encodeURIComponent(fullMessage)}`;
+      const useSms = confirm("Press OK to open Messages, or Cancel to copy the full challenge text.");
+
+      if (useSms) window.location.href = smsLink;
+      else prompt("Copy this message:", fullMessage);
     }
 
     function render() {
@@ -108,29 +384,43 @@
         const timeLabel = formatTime(g.time);
 
         div.innerHTML = `
+          <div class="card-loading">Creating challenge ✨</div>
           <img src="${g.image}" alt="Saved game">
           <div class="card-meta">Puzzle ${sizeLabel}</div>
           <div class="card-stats">
             <div class="mini-stat">Moves: ${movesLabel}</div>
             <div class="mini-stat">Time: ${timeLabel}</div>
           </div>
+          <div class="card-actions">
+            <button class="mini-action play" type="button">▶️ Play</button>
+            <button class="mini-action challenge" type="button">🚀 Send</button>
+            <button class="mini-action delete" type="button">🗑️</button>
+          </div>
         `;
 
-        div.onclick = () => {
-          localStorage.setItem("tempImage", g.image);
-          localStorage.setItem("gameConfig", JSON.stringify(g.config || { type: "puzzle", size: 3 }));
-          window.location.href = "game.html";
+        div.querySelector(".mini-action.play").onclick = (e) => {
+          e.stopPropagation();
+          playGame(g);
         };
 
+        div.querySelector(".mini-action.challenge").onclick = (e) => {
+          e.stopPropagation();
+          openChallengeChooser(g, div);
+        };
+
+        div.querySelector(".mini-action.delete").onclick = (e) => {
+          e.stopPropagation();
+          deleteGame(g.id);
+        };
+
+        div.onclick = () => playGame(g);
         grid.appendChild(div);
       });
 
-      if (games.length >= FREE_LIMIT) {
-        showPaywall();
-      }
+      if (games.length >= FREE_LIMIT) showPaywall();
+      else hidePaywall();
     }
 
-    cleanupSharedGames();
     render();
   </script>
 </body>

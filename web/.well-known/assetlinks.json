@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ricky77swe.snap2play",
+      "sha256_cert_fingerprints": [
+        "6C:56:FE:49:8B:67:EF:7A:9B:94:08:10:31:FA:D9:AC:D8:D4:87:AB:89:96:32:2A:51:D1:A8:28:28:EB:F5:A2",
+        "6D:74:AB:34:46:BC:D4:54:54:17:5E:29:CD:16:BB:D0:9D:18:7E:81:33:95:B8:80:86:AB:71:04:86:76:7F:59"
+      ]
+    }
+  }
+]

@@ -15,7 +15,35 @@
   <title>Snap2Play - Puzzle</title>
   <link rel="stylesheet" href="style.css">
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
   <style>
+    .win-actions {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 8px;
+      justify-content: center;
+      margin: 12px 6px 8px;
+    }
+
+    .small-win-btn {
+      flex: 1;              /* istället för width */
+      min-width: 0;         /* viktigt för flex */
+      min-height: 44px;     /* lite mindre höjd */
+      padding: 6px 4px;     /* mindre padding */
+      font-size: 12px;      /* mindre text */
+      border-radius: 14px;
+    }
+
+    @media (max-width: 390px) {
+      .small-win-btn {
+        font-size: 13px;
+        min-height: 46px;
+      }
+    }
+
     .game-wrap {
       position: relative;
       z-index: 1;
@@ -27,6 +55,8 @@
         12px
         calc(env(safe-area-inset-bottom, 0px) + 18px);
       box-sizing: border-box;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     .game-header {
@@ -43,72 +73,91 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       min-height: 0;
+      padding-top: 8px;
+      padding-bottom: 28px;
     }
 
-    .mode-note {
+    .mode-note,
+    .challenge-status,
+    .expiry-note {
+      width: min(92vw, 560px);
       margin: 0 0 8px;
-      padding: 8px 14px;
+      padding: 10px 14px;
       border-radius: 14px;
-      background: rgba(255,255,255,0.14);
       backdrop-filter: blur(8px);
       font-size: 14px;
       font-weight: 800;
       box-shadow: 0 8px 18px rgba(0,0,0,0.16);
       display: none;
+      text-align: center;
+    }
+
+    .mode-note {
+      background: linear-gradient(180deg, rgba(86,110,255,0.28), rgba(125,77,255,0.22));
+      border: 1px solid rgba(255,255,255,0.12);
+      font-weight: 900;
+    }
+
+    .challenge-status {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .challenge-status strong {
+      color: #ffd84d;
+    }
+
+    .expiry-note {
+      background: linear-gradient(180deg, rgba(255,110,110,0.22), rgba(255,70,120,0.18));
+      border: 1px solid rgba(255,255,255,0.10);
     }
 
     .diff-row {
       display: flex;
       justify-content: center;
-      gap: 6px;
+      gap: 3px;
       flex-wrap: nowrap;
       margin: 0 0 10px;
-      padding: 0 4px;
+      padding: 0 2px;
       position: relative;
       z-index: 2;
+      width: 100%;
+      overflow: hidden;
     }
 
     .diff-chip {
-      padding: 8px 10px;
-      min-width: 50px;
-      border-radius: 12px;
+      padding: 6px 4px;
+      min-width: 36px;
+      max-width: 48px;
+      flex: 1 1 0;
+      border-radius: 10px;
       background: rgba(255,255,255,0.16);
       backdrop-filter: blur(8px);
       box-shadow: 0 0 10px rgba(255,255,255,0.08);
       cursor: pointer;
-      font-weight: 700;
-      font-size: 13px;
-      transition: transform 0.1s ease, background 0.12s ease, opacity 0.12s ease;
+      font-weight: 800;
+      font-size: 11px;
+      transition: transform 0.1s ease, background 0.12s ease, opacity 0.12s ease, color 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
       user-select: none;
+      text-align: center;
+      white-space: nowrap;
     }
 
-    @media (max-width: 430px) {
-      .diff-chip {
-        padding: 7px 8px;
-        min-width: 46px;
-        font-size: 12px;
-        border-radius: 11px;
-      }
-
-      .diff-row {
-        gap: 5px;
-      }
-    }
-
-
-    .diff-chip:active {
-      transform: scale(0.96);
-    }
+    .diff-chip:active { transform: scale(0.96); }
 
     .diff-chip.active {
-      background: rgba(255, 196, 0, 0.92);
+      background: linear-gradient(180deg, #ffd84d, #ffb300);
       color: #1a1a1a;
+      box-shadow: 0 0 12px rgba(255,200,0,0.7);
+      transform: scale(1.05);
     }
 
     .diff-chip.locked {
-      opacity: 0.55;
+      opacity: 0.45;
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.5);
+      filter: blur(0.3px);
     }
 
     .diff-chip.challenge-disabled {
@@ -118,6 +167,7 @@
 
     .board-wrap {
       width: min(92vw, 520px);
+      max-height: 52vh;
       margin: 0 auto;
       position: relative;
       display: flex;
@@ -127,6 +177,7 @@
 
     .board {
       width: 100%;
+      max-height: 52vh;
       aspect-ratio: 1 / 1;
       display: grid;
       gap: 2px;
@@ -142,7 +193,14 @@
         padding 0.35s ease,
         border-radius 0.35s ease,
         background 0.35s ease,
-        box-shadow 0.35s ease;
+        box-shadow 0.35s ease,
+        filter 0.25s ease,
+        opacity 0.25s ease;
+    }
+
+    .board.challenge-failed {
+      filter: blur(10px) brightness(0.45);
+      opacity: 0.25;
     }
 
     .board.puzzle-complete {
@@ -183,22 +241,12 @@
       transform: translateX(-135%);
     }
 
-    .board-shimmer.run {
-      animation: shimmerSweep 1.55s ease forwards;
-    }
+    .board-shimmer.run { animation: shimmerSweep 1.55s ease forwards; }
 
     @keyframes shimmerSweep {
-      0% {
-        opacity: 0;
-        transform: translateX(-135%);
-      }
-      10% {
-        opacity: 1;
-      }
-      100% {
-        opacity: 1;
-        transform: translateX(135%);
-      }
+      0% { opacity: 0; transform: translateX(-135%); }
+      10% { opacity: 1; }
+      100% { opacity: 1; transform: translateX(135%); }
     }
 
     .puzzle-piece {
@@ -223,9 +271,7 @@
       box-shadow: none;
     }
 
-    .puzzle-piece:active {
-      cursor: grabbing;
-    }
+    .puzzle-piece:active { cursor: grabbing; }
 
     .puzzle-piece.hover-target {
       outline: 4px solid rgba(255, 213, 74, .92);
@@ -234,9 +280,7 @@
         0 10px 28px rgba(0,0,0,.35);
     }
 
-    .puzzle-piece.dragging {
-      opacity: .35;
-    }
+    .puzzle-piece.dragging { opacity: .35; }
 
     .drag-clone {
       border-radius: 10px;
@@ -245,7 +289,8 @@
 
     .win {
       display: none;
-      margin-top: 18px;
+      margin-top: 14px;
+      padding-bottom: 30px;
       position: relative;
       z-index: 2;
       opacity: 0;
@@ -259,14 +304,8 @@
     }
 
     @keyframes revealWin {
-      0% {
-        opacity: 0;
-        transform: translateY(14px) scale(0.98);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
+      0% { opacity: 0; transform: translateY(14px) scale(0.98); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
     }
 
     .win-title {
@@ -313,36 +352,12 @@
         0 0 14px rgba(255,255,255,0.08);
     }
 
-    .action-btn .icon {
-      font-size: 22px;
-      line-height: 1;
-    }
-
-    .action-btn.primary {
-      background: linear-gradient(180deg, #ffc93c, #ff8b00);
-      box-shadow:
-        0 12px 26px rgba(0,0,0,0.22),
-        0 0 16px rgba(255,181,0,0.35);
-    }
-
-    .action-btn.secondary {
-      background: linear-gradient(180deg, #62c7ff, #2f66e8);
-      box-shadow:
-        0 12px 26px rgba(0,0,0,0.22),
-        0 0 16px rgba(105,189,255,0.28);
-    }
-
-    .action-btn.tertiary {
-      background: linear-gradient(180deg, #7bc7ff, #4b87ff);
-      box-shadow:
-        0 12px 26px rgba(0,0,0,0.22),
-        0 0 16px rgba(125,190,255,0.22);
-    }
-
-    .action-btn:active {
-      transform: scale(0.96);
-      filter: brightness(1.06);
-    }
+    .action-btn .icon { font-size: 22px; line-height: 1; }
+    .action-btn.primary { background: linear-gradient(180deg, #ffc93c, #ff8b00); box-shadow: 0 12px 26px rgba(0,0,0,0.22), 0 0 16px rgba(255,181,0,0.35); }
+    .action-btn.secondary { background: linear-gradient(180deg, #62c7ff, #2f66e8); box-shadow: 0 12px 26px rgba(0,0,0,0.22), 0 0 16px rgba(105,189,255,0.28); }
+    .action-btn.tertiary { background: linear-gradient(180deg, #7bc7ff, #4b87ff); box-shadow: 0 12px 26px rgba(0,0,0,0.22), 0 0 16px rgba(125,190,255,0.22); }
+    .action-btn.danger { background: linear-gradient(180deg, #ff6b6b, #ff2d55); box-shadow: 0 12px 26px rgba(0,0,0,0.22), 0 0 16px rgba(255,100,130,0.32); }
+    .action-btn:active { transform: scale(0.96); filter: brightness(1.06); }
 
     .stats {
       display: flex;
@@ -363,49 +378,131 @@
       min-width: 128px;
     }
 
-    @media (orientation: landscape) {
-      body {
-        overflow-y: auto;
-      }
-
-      .game-wrap {
-        padding:
-          calc(env(safe-area-inset-top, 0px) + 8px)
-          16px
-          calc(env(safe-area-inset-bottom, 0px) + 12px);
-      }
-
-      .game-header {
-        min-height: 48px;
-        margin-bottom: 0;
-      }
-
-      .game-main {
-        justify-content: center;
-      }
-
-      .diff-row {
-        margin-bottom: 8px;
-      }
-
-      .board-wrap {
-        width: min(70vw, 920px);
-      }
-
-      .board {
-        max-height: 62vh;
-      }
-
-      .action-btn {
-        min-width: 150px;
-        min-height: 62px;
-        font-size: 17px;
-      }
-
-      .win-title {
-        font-size: 30px;
-      }
+    .paywall {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 20px;
+      background: linear-gradient(180deg, #1c1f3f, #121426);
+      border-radius: 22px;
+      padding: 20px;
+      display: none;
+      z-index: 20;
+      box-shadow:
+        0 20px 50px rgba(0,0,0,0.5),
+        0 0 20px rgba(120,180,255,0.2);
+      animation: slideUp 0.35s ease;
+      text-align: center;
     }
+
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .paywall-title {
+      font-size: 22px;
+      font-weight: 900;
+      margin-bottom: 8px;
+      background: linear-gradient(90deg, #ffd84d, #ff7a00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .paywall-text {
+      font-size: 15px;
+      opacity: 0.9;
+      margin-bottom: 16px;
+      line-height: 1.4;
+      white-space: pre-line;
+    }
+
+    .paywall .action-btn { width: 100%; margin-top: 6px; }
+    .paywall-actions { display: flex; gap: 10px; flex-direction: column; margin-top: 8px; }
+
+    .paywall-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: transparent;
+      border: 0;
+      color: rgba(255,255,255,0.8);
+      font-size: 24px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    @media (orientation: landscape) {
+      body { overflow-y: auto; }
+      .game-wrap { padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px calc(env(safe-area-inset-bottom, 0px) + 12px); }
+      .game-header { min-height: 48px; margin-bottom: 0; }
+      .game-main { justify-content: flex-start; padding-top: 0; }
+      .diff-row { margin-bottom: 8px; }
+      .board-wrap { width: min(68vw, 760px); max-height: 48vh; }
+      .board { max-height: 48vh; }
+      .win { margin-top: 10px; }
+      .action-btn { min-width: 150px; min-height: 52px; padding: 10px 16px; font-size: 16px; }
+      .stat-pill { padding: 9px 14px; font-size: 15px; }
+      .win-title { font-size: 30px; }
+    }
+
+    .challenge-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 5, 25, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.challenge-intro-card {
+  width: min(88vw, 420px);
+  padding: 28px 22px;
+  border-radius: 30px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(98,199,255,.25), rgba(123,77,255,.22));
+  box-shadow: 0 24px 60px rgba(0,0,0,.45), 0 0 30px rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.18);
+}
+
+.challenge-intro-title {
+  font-size: 34px;
+  font-weight: 1000;
+  margin-bottom: 12px;
+  text-shadow: 0 4px 18px rgba(0,0,0,.35);
+}
+
+.challenge-intro-rule {
+  font-size: 24px;
+  font-weight: 1000;
+  color: #ffd84d;
+  margin-bottom: 20px;
+  text-shadow: 0 3px 14px rgba(0,0,0,.35);
+}
+
+.challenge-go-btn {
+  border: 0;
+  border-radius: 24px;
+  padding: 16px 40px;
+  font-size: 30px;
+  font-weight: 1000;
+  color: white;
+  background: linear-gradient(180deg, #ffc93c, #ff7a00);
+  box-shadow: 0 14px 30px rgba(0,0,0,.35), 0 0 22px rgba(255,190,0,.35);
+}
+
+.challenge-countdown {
+  margin-top: 16px;
+  font-size: 72px;
+  font-weight: 1000;
+  color: white;
+  text-shadow: 0 6px 22px rgba(0,0,0,.45);
+  min-height: 86px;
+}
+
   </style>
 </head>
 <body>
@@ -416,6 +513,8 @@
 
     <div class="game-main">
       <div class="mode-note" id="modeNote"></div>
+      <div class="expiry-note" id="expiryNote"></div>
+      <div class="challenge-status" id="challengeStatus"></div>
       <div class="diff-row" id="diffRow"></div>
 
       <div class="board-wrap" id="boardWrap">
@@ -424,26 +523,13 @@
       </div>
 
       <div class="win" id="win">
-        <div class="win-title">🎉 Great job!</div>
-        <div class="win-subtitle">You solved the puzzle!</div>
+        <div class="win-title" id="winTitle">🎉 Amazing!</div>
+        <div class="win-subtitle" id="winSubtitle" style="display:none;"></div>
 
-        <div class="actions">
-          <button class="action-btn secondary" onclick="saveGame()">
-            <span class="icon">💾</span>
-            <span>Save</span>
-          </button>
-
-          <button class="action-btn primary" onclick="shareGame()">
-            <span class="icon">🚀</span>
-            <span>Challenge</span>
-          </button>
-        </div>
-
-        <div class="actions">
-          <button class="action-btn tertiary" onclick="restart()">
-            <span class="icon">🔄</span>
-            <span>Play Again</span>
-          </button>
+        <div class="actions win-actions">
+          <button class="action-btn secondary small-win-btn" onclick="saveGame()">💾 Save</button>
+          <button class="action-btn primary small-win-btn" onclick="openChallengeChooser()">🚀 Share</button>
+          <button class="action-btn tertiary small-win-btn" onclick="restart()">🔄 Again</button>
         </div>
 
         <div class="stats">
@@ -454,20 +540,45 @@
     </div>
   </div>
 
+  <div id="paywall" class="paywall">
+    <button class="paywall-close" onclick="hidePaywall()">×</button>
+    <div class="paywall-title" id="paywallTitle">Level Locked</div>
+    <div class="paywall-text" id="paywallText">Finish more puzzles to unlock this level.</div>
+    <div class="paywall-actions" id="paywallActions">
+      <button class="action-btn primary" onclick="hidePaywall()">Got it</button>
+    </div>
+  </div>
+
+  <div id="challengeIntro" class="challenge-intro">
+    <div class="challenge-intro-card">
+      <div class="challenge-intro-title">📸🧩 Challenge!</div>
+      <div class="challenge-intro-rule" id="challengeIntroRule">Beat the challenge</div>
+      <button class="challenge-go-btn" id="challengeGoBtn" onclick="startChallengeCountdown()">GO!</button>
+      <div class="challenge-countdown" id="challengeCountdown"></div>
+    </div>
+  </div>
+
   <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDDVRGbZ4m4RcKkVhMO0K2rPwAuNrinjuE",
+      authDomain: "snap2play-app.firebaseapp.com",
+      projectId: "snap2play-app",
+      storageBucket: "snap2play-app.firebasestorage.app",
+      messagingSenderId: "487938028395",
+      appId: "1:487938028395:web:250fd22871d1433b73522e",
+      measurementId: "G-994W82KCZS"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
     const FREE_LIMIT = 3;
-    const SHARE_LIFETIME = 24 * 60 * 60 * 1000;
+    const CHALLENGE_LIFETIME_MS = 12 * 60 * 60 * 1000;
+    const PREMIUM_LINK = "#";
 
     const SIZE_LEVELS = [2, 3, 4, 5, 6, 7, 8];
-    const UNLOCK_REQUIREMENTS = {
-      2: 0,
-      3: 0,
-      4: 0,
-      5: 5,
-      6: 15,
-      7: 35,
-      8: 60
-    };
+    const UNLOCK_REQUIREMENTS = { 2: 0, 3: 0, 4: 0, 5: 5, 6: 15, 7: 35, 8: 60 };
 
     let image = localStorage.getItem("tempImage");
     let config = JSON.parse(localStorage.getItem("gameConfig") || '{"type":"puzzle","size":3}');
@@ -477,11 +588,18 @@
     const boardWrap = document.getElementById("boardWrap");
     const boardShimmer = document.getElementById("boardShimmer");
     const winEl = document.getElementById("win");
+    const winSubtitleEl = document.getElementById("winSubtitle");
     const movesStatEl = document.getElementById("movesStat");
     const timeStatEl = document.getElementById("timeStat");
     const diffRowEl = document.getElementById("diffRow");
     const modeNoteEl = document.getElementById("modeNote");
-    const imageMeta = JSON.parse(localStorage.getItem("tempImageMeta") || '{"width":1,"height":1}');
+    const challengeStatusEl = document.getElementById("challengeStatus");
+    const expiryNoteEl = document.getElementById("expiryNote");
+    let imageMeta = JSON.parse(localStorage.getItem("tempImageMeta") || '{"width":1,"height":1}');
+    const paywallEl = document.getElementById("paywall");
+    const paywallTitleEl = document.getElementById("paywallTitle");
+    const paywallTextEl = document.getElementById("paywallText");
+    const paywallActionsEl = document.getElementById("paywallActions");
 
     let puzzleSolved = false;
     let moves = 0;
@@ -489,16 +607,33 @@
     let elapsedSeconds = 0;
     let timerInterval = null;
     let winCounted = false;
+    let dndInitialized = false;
 
     let challengeMode = false;
     let challengeLockedSize = null;
+    let challengeRule = null;
+    let challengeFailed = false;
+    let challengeExpiresAt = null;
+    let challengeIntroShown = false;
 
     function getProfileStats() {
-      return JSON.parse(localStorage.getItem("profileStats") || '{"completedCount":0}');
+      return JSON.parse(localStorage.getItem("profileStats") || '{"completedCount":0,"premiumUnlocked":false}');
     }
 
     function saveProfileStats(stats) {
       localStorage.setItem("profileStats", JSON.stringify(stats));
+    }
+
+    function isPremium() {
+      return Boolean(getProfileStats().premiumUnlocked);
+    }
+
+    function unlockPremiumLocally() {
+      const stats = getProfileStats();
+      stats.premiumUnlocked = true;
+      saveProfileStats(stats);
+      renderDifficultyChips();
+      hidePaywall();
     }
 
     function incrementCompletedCountOnce() {
@@ -515,17 +650,54 @@
 
     function isSizeUnlocked(targetSize) {
       if (challengeMode && targetSize === challengeLockedSize) return true;
+      if (isPremium()) return true;
       return getCompletedCount() >= (UNLOCK_REQUIREMENTS[targetSize] || 0);
-    }
-
-    function isChallengeSharedGame() {
-      const params = new URLSearchParams(location.search);
-      return params.has("share");
     }
 
     function persistConfig() {
       localStorage.setItem("gameConfig", JSON.stringify({ type: "puzzle", size }));
     }
+
+    function showPaywall(title, text, actionsHtml) {
+      paywallTitleEl.textContent = title || "Level Locked";
+      paywallTextEl.textContent = text || "Finish more puzzles to unlock this level.";
+      paywallActionsEl.innerHTML = actionsHtml || `<button class="action-btn primary" onclick="hidePaywall()">Got it</button>`;
+      paywallEl.style.display = "block";
+    }
+
+    function hidePaywall() { paywallEl.style.display = "none"; }
+
+    function goPremium() {
+      if (PREMIUM_LINK && PREMIUM_LINK !== "#") {
+        window.location.href = PREMIUM_LINK;
+        return;
+      }
+
+      showPaywall(
+        "Premium coming soon",
+        "Premium will unlock all puzzle sizes instantly.\nFor testing you can unlock Premium locally.",
+        `
+          <button class="action-btn secondary" onclick="unlockPremiumLocally()">Unlock locally for testing</button>
+          <button class="action-btn primary" onclick="hidePaywall()">OK</button>
+        `
+      );
+    }
+
+    function showPremiumLock(targetSize) {
+      const needed = UNLOCK_REQUIREMENTS[targetSize] || 0;
+      const left = Math.max(0, needed - getCompletedCount());
+
+      showPaywall(
+        `${targetSize}x${targetSize} locked`,
+        `Unlock this level by finishing ${left} more puzzle${left === 1 ? "" : "s"}\nOR get PREMIUM to unlock all sizes now ✨`,
+        `
+          <button class="action-btn primary" onclick="goPremium()">Go Premium</button>
+          <button class="action-btn secondary" onclick="hidePaywall()">Maybe later</button>
+        `
+      );
+    }
+
+    function goBack() { window.location = "index.html"; }
 
     function renderModeNote() {
       if (challengeMode) {
@@ -537,6 +709,48 @@
       }
     }
 
+    function updateExpiryNote() {
+      if (!challengeMode || !challengeExpiresAt) {
+        expiryNoteEl.style.display = "none";
+        expiryNoteEl.textContent = "";
+        return;
+      }
+
+      const remainingMs = challengeExpiresAt - Date.now();
+
+      if (remainingMs <= 0) {
+        expiryNoteEl.style.display = "block";
+        expiryNoteEl.textContent = "This challenge has expired ⏳";
+        return;
+      }
+
+      const hours = Math.floor(remainingMs / 3600000);
+      const mins = Math.ceil((remainingMs % 3600000) / 60000);
+
+      expiryNoteEl.style.display = "block";
+      expiryNoteEl.textContent = hours > 0
+        ? `⏳ ${hours}h ${mins}m left to beat this challenge`
+        : `⚡ ${mins}m left — hurry up!`;
+    }
+
+    function renderChallengeStatus() {
+      if (!challengeMode || !challengeRule) {
+        challengeStatusEl.style.display = "none";
+        challengeStatusEl.textContent = "";
+        return;
+      }
+
+      challengeStatusEl.style.display = "block";
+
+      if (challengeRule.mode === "time") {
+        const remaining = Math.max(0, challengeRule.target - elapsedSeconds);
+        challengeStatusEl.innerHTML = `Beat this challenge in <strong>${challengeRule.target}s</strong> • Time left: <strong>${remaining}s</strong>`;
+      } else if (challengeRule.mode === "moves") {
+        const remaining = Math.max(0, challengeRule.target - moves);
+        challengeStatusEl.innerHTML = `Solve in <strong>${challengeRule.target} moves</strong> or less • Moves left: <strong>${remaining}</strong>`;
+      }
+    }
+
     function renderDifficultyChips() {
       diffRowEl.innerHTML = "";
 
@@ -545,20 +759,12 @@
         chip.className = "diff-chip";
         chip.textContent = `${level}x${level}`;
 
-        if (level === size) {
-          chip.classList.add("active");
-        }
+        if (level === size) chip.classList.add("active");
 
         if (challengeMode) {
-          if (level !== challengeLockedSize) {
-            chip.classList.add("challenge-disabled");
-          }
-        } else {
-          const unlocked = isSizeUnlocked(level);
-          if (!unlocked) {
-            chip.classList.add("locked");
-            chip.textContent = `${level}x${level} 🔒`;
-          }
+          if (level !== challengeLockedSize) chip.classList.add("challenge-disabled");
+        } else if (!isSizeUnlocked(level)) {
+          chip.classList.add("locked");
         }
 
         chip.onclick = () => setSize(level);
@@ -570,10 +776,8 @@
       if (challengeMode) return;
 
       if (!isSizeUnlocked(newSize)) {
-        const needed = UNLOCK_REQUIREMENTS[newSize] || 0;
-        const current = getCompletedCount();
-        const left = Math.max(0, needed - current);
-        alert(`Finish ${left} more puzzle${left === 1 ? "" : "s"} to unlock ${newSize}x${newSize}.`);
+        if (navigator.vibrate) navigator.vibrate(40);
+        showPremiumLock(newSize);
         return;
       }
 
@@ -583,57 +787,119 @@
       restart();
     }
 
-    function premium() {
-      alert("Premium coming 😄");
+    function resetImageMetaForChallenge() {
+      imageMeta = { width: 1, height: 1 };
     }
 
-    function goBack() {
-      window.location = "index.html";
-    }
+    function applyBoardAspect() {
+      const safeMeta = imageMeta && Number(imageMeta.width) > 0 && Number(imageMeta.height) > 0
+        ? imageMeta
+        : { width: 1, height: 1 };
 
-    function cleanupSharedGames() {
-      let shared = JSON.parse(localStorage.getItem("sharedGames") || "[]");
-      const now = Date.now();
+      const isLandscape = window.matchMedia("(orientation: landscape)").matches;
 
-      shared = shared.filter(g => now - g.createdAt < SHARE_LIFETIME);
-      localStorage.setItem("sharedGames", JSON.stringify(shared));
-    }
-
-    function loadShared() {
-      const params = new URLSearchParams(location.search);
-      const id = params.get("share");
-      if (!id) return;
-
-      cleanupSharedGames();
-
-      let shared = JSON.parse(localStorage.getItem("sharedGames") || "[]");
-      const game = shared.find(g => g.id === id);
-
-      if (game) {
-        image = game.image;
-        config = game.config || { type: "puzzle", size: 3 };
-        size = config.size || 3;
-        challengeMode = true;
-        challengeLockedSize = size;
-        localStorage.setItem("tempImage", image);
-        persistConfig();
-      } else {
-        alert("This shared puzzle has expired ⏳");
-      }
+      boardWrap.style.width = isLandscape ? "min(68vw, 760px)" : "min(92vw, 520px)";
+      boardWrap.style.maxHeight = isLandscape ? "48vh" : "52vh";
+      board.style.width = "100%";
+      board.style.aspectRatio = `${safeMeta.width} / ${safeMeta.height}`;
+      board.style.height = "auto";
+      board.style.maxHeight = isLandscape ? "48vh" : "52vh";
     }
 
     function resetStats() {
       moves = 0;
       elapsedSeconds = 0;
-      startTime = Date.now();
+      startTime = challengeMode ? 0 : Date.now();
+
       movesStatEl.textContent = "Moves: 0";
       timeStatEl.textContent = "Time: 0s";
 
+      renderChallengeStatus();
+      updateExpiryNote();
+
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+
+      if (!challengeMode) {
+        startGameTimer();
+      }
+    }
+
+    function startGameTimer() {
+      startTime = Date.now();
+
       if (timerInterval) clearInterval(timerInterval);
+
       timerInterval = setInterval(() => {
-        if (puzzleSolved) return;
+        if (puzzleSolved || challengeFailed) return;
+
         elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+        renderChallengeStatus();
+        updateExpiryNote();
+
+        if (challengeMode && challengeExpiresAt && Date.now() > challengeExpiresAt) {
+          failExpiredChallenge();
+          return;
+        }
+
+        if (challengeMode && challengeRule && challengeRule.mode === "time" && elapsedSeconds > challengeRule.target) {
+          failChallenge("time");
+        }
       }, 250);
+    }
+
+    function showChallengeIntro() {
+      if (!challengeMode || !challengeRule) return;
+
+      const intro = document.getElementById("challengeIntro");
+      const rule = document.getElementById("challengeIntroRule");
+      const countdown = document.getElementById("challengeCountdown");
+      const goBtn = document.getElementById("challengeGoBtn");
+
+      if (challengeRule.mode === "time") {
+        rule.textContent = `Beat ${challengeRule.target}s ⏱️`;
+      } else {
+        rule.textContent = `Max ${challengeRule.target} moves 🧩`;
+      }
+
+      countdown.textContent = "";
+      goBtn.style.display = "inline-block";
+      intro.style.display = "flex";
+    }
+
+    function startChallengeCountdown() {
+      const countdown = document.getElementById("challengeCountdown");
+      const goBtn = document.getElementById("challengeGoBtn");
+      const intro = document.getElementById("challengeIntro");
+
+      goBtn.style.display = "none";
+
+      let n = 3;
+      countdown.textContent = n;
+
+      const interval = setInterval(() => {
+        n--;
+
+        if (n > 0) {
+          countdown.textContent = n;
+        } else {
+          clearInterval(interval);
+          countdown.textContent = "GO!";
+          haptic("medium");
+
+          setTimeout(() => {
+            intro.style.display = "none";
+            elapsedSeconds = 0;
+            moves = 0;
+            movesStatEl.textContent = "Moves: 0";
+            timeStatEl.textContent = "Time: 0s";
+            renderChallengeStatus();
+            startGameTimer();
+          }, 650);
+        }
+      }, 800);
     }
 
     function stopTimer() {
@@ -642,40 +908,25 @@
         timerInterval = null;
       }
       elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-    }
-
-    function applyBoardAspect() {
-      const ratio = imageMeta.width / imageMeta.height;
-
-      boardWrap.style.width = "min(92vw, 520px)";
-      board.style.width = "100%";
-      board.style.aspectRatio = `${imageMeta.width} / ${imageMeta.height}`;
-      board.style.height = "auto";
-
-      if (ratio > 1.4) {
-        board.style.maxHeight = "60vh";
-      } else if (ratio < 0.8) {
-        board.style.maxHeight = "70vh";
-      } else {
-        board.style.maxHeight = "";
-      }
-
-      if (window.matchMedia("(orientation: landscape)").matches) {
-        boardWrap.style.width = "min(70vw, 920px)";
-      }
+      renderChallengeStatus();
     }
 
     function buildPuzzle() {
       puzzleSolved = false;
+      challengeFailed = false;
       winCounted = false;
+
       applyBoardAspect();
       renderModeNote();
       renderDifficultyChips();
+      renderChallengeStatus();
+      updateExpiryNote();
 
       winEl.classList.remove("show");
       winEl.style.display = "none";
-      board.classList.remove("puzzle-complete");
+      board.classList.remove("puzzle-complete", "challenge-failed");
       boardShimmer.classList.remove("run");
+
       resetStats();
 
       board.innerHTML = "";
@@ -698,7 +949,7 @@
 
       for (let i = 0; i < total; i++) {
         const correctIndex = i;
-        const posX = (correctIndex % size);
+        const posX = correctIndex % size;
         const posY = Math.floor(correctIndex / size);
 
         const piece = document.createElement("div");
@@ -709,7 +960,7 @@
         piece.style.backgroundImage = `url("${image}")`;
         piece.style.backgroundSize = `${size * 100}% ${size * 100}%`;
         piece.style.backgroundPosition =
-          `${(posX * 100) / (Math.max(size - 1, 1))}% ${(posY * 100) / (Math.max(size - 1, 1))}%`;
+          `${(posX * 100) / Math.max(size - 1, 1)}% ${(posY * 100) / Math.max(size - 1, 1)}%`;
 
         pieces.push(piece);
       }
@@ -719,21 +970,31 @@
       board.appendChild(frag);
 
       enableDnD();
+
+      if (challengeMode && !challengeIntroShown) {
+        challengeIntroShown = true;
+        showChallengeIntro();
+      } else if (challengeMode) {
+        startGameTimer();
+      }
     }
 
     function enableDnD() {
+      if (!dndInitialized) {
+        dndInitialized = true;
+        board.addEventListener("dragstart", onDragStart);
+        board.addEventListener("dragend", onDragEnd);
+        board.addEventListener("dragover", onDragOver);
+        board.addEventListener("dragleave", onDragLeave);
+        board.addEventListener("drop", onDrop);
+      }
+
       let dragged = null;
       let hoverEl = null;
 
-      board.addEventListener("dragstart", onDragStart);
-      board.addEventListener("dragend", onDragEnd);
-      board.addEventListener("dragover", onDragOver);
-      board.addEventListener("dragleave", onDragLeave);
-      board.addEventListener("drop", onDrop);
-
       function onDragStart(e) {
         const el = e.target;
-        if (!el.classList.contains("puzzle-piece") || puzzleSolved) return;
+        if (!el.classList.contains("puzzle-piece") || puzzleSolved || challengeFailed) return;
         dragged = el;
         dragged.classList.add("dragging");
       }
@@ -749,7 +1010,7 @@
 
       function onDragOver(e) {
         e.preventDefault();
-        if (puzzleSolved) return;
+        if (puzzleSolved || challengeFailed) return;
         const t = e.target;
         if (!t.classList.contains("puzzle-piece") || t === dragged) return;
 
@@ -768,7 +1029,7 @@
 
       function onDrop(e) {
         e.preventDefault();
-        if (puzzleSolved) return;
+        if (puzzleSolved || challengeFailed) return;
         const t = e.target;
         if (!dragged || !t.classList.contains("puzzle-piece") || dragged === t) return;
 
@@ -777,78 +1038,73 @@
       }
 
       Array.from(board.querySelectorAll(".puzzle-piece")).forEach(piece => enableTouchDrag(piece));
+    }
 
-      function enableTouchDrag(piece) {
-        let clone = null;
-        let currentHover = null;
-        let startW = 0;
-        let startH = 0;
+    function enableTouchDrag(piece) {
+      let clone = null;
+      let currentHover = null;
+      let startW = 0;
+      let startH = 0;
 
-        piece.addEventListener("touchstart", e => {
-          if (puzzleSolved) return;
-          const t = e.touches[0];
-          startW = piece.offsetWidth;
-          startH = piece.offsetHeight;
+      piece.addEventListener("touchstart", e => {
+        if (puzzleSolved || challengeFailed) return;
+        const t = e.touches[0];
+        startW = piece.offsetWidth;
+        startH = piece.offsetHeight;
 
-          clone = piece.cloneNode(true);
-          Object.assign(clone.style, {
-            position: "fixed",
-            left: `${t.clientX - startW / 2}px`,
-            top: `${t.clientY - startH / 2}px`,
-            width: `${startW}px`,
-            height: `${startH}px`,
-            zIndex: 1000,
-            opacity: 0.92,
-            pointerEvents: "none",
-            border: "2px solid rgba(255,255,255,.25)"
-          });
-          clone.classList.add("drag-clone");
-          document.body.appendChild(clone);
-          piece.classList.add("dragging");
-        }, { passive: true });
+        clone = piece.cloneNode(true);
+        Object.assign(clone.style, {
+          position: "fixed",
+          left: `${t.clientX - startW / 2}px`,
+          top: `${t.clientY - startH / 2}px`,
+          width: `${startW}px`,
+          height: `${startH}px`,
+          zIndex: 1000,
+          opacity: 0.92,
+          pointerEvents: "none",
+          border: "2px solid rgba(255,255,255,.25)"
+        });
+        clone.classList.add("drag-clone");
+        document.body.appendChild(clone);
+        piece.classList.add("dragging");
+      }, { passive: true });
 
-        piece.addEventListener("touchmove", e => {
-          if (puzzleSolved) return;
-          e.preventDefault();
-          const t = e.touches[0];
+      piece.addEventListener("touchmove", e => {
+        if (puzzleSolved || challengeFailed) return;
+        e.preventDefault();
+        const t = e.touches[0];
 
-          if (clone) {
-            clone.style.left = `${t.clientX - startW / 2}px`;
-            clone.style.top = `${t.clientY - startH / 2}px`;
-          }
+        if (clone) {
+          clone.style.left = `${t.clientX - startW / 2}px`;
+          clone.style.top = `${t.clientY - startH / 2}px`;
+        }
 
-          const target = document.elementFromPoint(t.clientX, t.clientY);
+        const target = document.elementFromPoint(t.clientX, t.clientY);
 
-          if (target && target.classList.contains("puzzle-piece") && target !== piece) {
-            if (currentHover && currentHover !== target) {
-              currentHover.classList.remove("hover-target");
-            }
-            currentHover = target;
-            currentHover.classList.add("hover-target");
-          } else if (currentHover) {
-            currentHover.classList.remove("hover-target");
-            currentHover = null;
-          }
-        }, { passive: false });
+        if (target && target.classList.contains("puzzle-piece") && target !== piece) {
+          if (currentHover && currentHover !== target) currentHover.classList.remove("hover-target");
+          currentHover = target;
+          currentHover.classList.add("hover-target");
+        } else if (currentHover) {
+          currentHover.classList.remove("hover-target");
+          currentHover = null;
+        }
+      }, { passive: false });
 
-        piece.addEventListener("touchend", () => {
-          if (clone) {
-            clone.remove();
-            clone = null;
-          }
+      piece.addEventListener("touchend", () => {
+        if (clone) clone.remove();
+        clone = null;
+        piece.classList.remove("dragging");
 
-          piece.classList.remove("dragging");
+        if (puzzleSolved || challengeFailed) return;
 
-          if (puzzleSolved) return;
-
-          if (currentHover) {
-            swapPieces(piece, currentHover);
-            currentHover.classList.remove("hover-target");
-            currentHover = null;
-            maybeWin();
-          }
-        }, { passive: true });
-      }
+        if (currentHover) {
+          swapPieces(piece, currentHover);
+          currentHover.classList.remove("hover-target");
+          currentHover = null;
+          maybeWin();
+        }
+      }, { passive: true });
     }
 
     function swapPieces(a, b) {
@@ -866,26 +1122,56 @@
       }
 
       moves += 1;
-      a.classList.remove("dragging");
-      b.classList.remove("dragging");
-      a.classList.remove("hover-target");
-      b.classList.remove("hover-target");
+      haptic("light");
+      a.classList.remove("dragging", "hover-target");
+      b.classList.remove("dragging", "hover-target");
+
+      renderChallengeStatus();
+
+      if (challengeMode && challengeRule && challengeRule.mode === "moves" && moves > challengeRule.target) {
+        failChallenge("moves");
+      }
     }
 
     function maybeWin() {
-      if (puzzleSolved) return;
+      if (puzzleSolved || challengeFailed) return;
 
+      const winTitles = ["🎉 Amazing!", "🚀 Nice!", "⭐ Excellent!", "🔥 Awesome!", "🧩 Perfect!"];
+      document.getElementById("winTitle").textContent =
+        winTitles[Math.floor(Math.random() * winTitles.length)];
+      
       const kids = Array.from(board.children);
       const ok = kids.every((el, i) => String(i) === el.dataset.correct);
 
       if (!ok) return;
 
+      if (challengeMode && challengeRule) {
+        if (challengeRule.mode === "time" && elapsedSeconds > challengeRule.target) {
+          failChallenge("time");
+          return;
+        }
+
+        if (challengeRule.mode === "moves" && moves > challengeRule.target) {
+          failChallenge("moves");
+          return;
+        }
+      }
+
       puzzleSolved = true;
       stopTimer();
+      haptic("success");
       incrementCompletedCountOnce();
 
       movesStatEl.textContent = `Moves: ${moves}`;
       timeStatEl.textContent = `Time: ${formatTime(elapsedSeconds)}`;
+
+      if (challengeMode && challengeRule) {
+        winSubtitleEl.textContent = challengeRule.mode === "time"
+          ? `You beat ${challengeRule.target}s with ${elapsedSeconds}s!`
+          : `You solved it in ${moves} moves!`;
+      } else {
+        winSubtitleEl.textContent = "You solved the puzzle!";
+      }
 
       board.classList.add("puzzle-complete");
 
@@ -902,9 +1188,7 @@
 
       setTimeout(() => {
         winEl.style.display = "block";
-        requestAnimationFrame(() => {
-          winEl.classList.add("show");
-        });
+        requestAnimationFrame(() => winEl.classList.add("show"));
       }, 1900);
     }
 
@@ -920,6 +1204,50 @@
       }, 900);
     }
 
+    function failChallenge(type) {
+      if (challengeFailed || puzzleSolved) return;
+      challengeFailed = true;
+      stopTimer();
+      haptic("error");
+
+      board.classList.add("challenge-failed");
+
+      const title = type === "time" ? "Time’s up!" : "Out of moves!";
+      const text = type === "time"
+        ? "You have to solve the puzzle faster to reveal the picture."
+        : "You have to solve the puzzle in fewer moves to reveal the picture.";
+
+      showPaywall(
+        title,
+        text,
+        `
+          <button class="action-btn danger" onclick="retryChallenge()">Try Again</button>
+          <button class="action-btn secondary" onclick="goBack()">Back</button>
+        `
+      );
+
+      if (navigator.vibrate) navigator.vibrate([60, 50, 60]);
+    }
+
+    function failExpiredChallenge() {
+      if (challengeFailed || puzzleSolved) return;
+      challengeFailed = true;
+      stopTimer();
+      board.classList.add("challenge-failed");
+
+      showPaywall(
+        "Challenge expired ⏳",
+        "This challenge disappeared before you finished it.",
+        `<button class="action-btn secondary" onclick="goBack()">Back</button>`
+      );
+    }
+
+    function retryChallenge() {
+      hidePaywall();
+      challengeIntroShown = true;
+      buildPuzzle();
+    }
+
     function formatTime(totalSeconds) {
       const mins = Math.floor(totalSeconds / 60);
       const secs = totalSeconds % 60;
@@ -927,19 +1255,77 @@
       return `${mins}m ${secs}s`;
     }
 
-    function restart() {
-      buildPuzzle();
+    function restart() { buildPuzzle(); }
+
+    async function uploadChallenge(imageData, movesValue, timeValue, modeValue, gridSize) {
+      const id = Date.now().toString();
+      const createdAt = Date.now();
+      const expiresAt = createdAt + CHALLENGE_LIFETIME_MS;
+      let imageUrl = imageData;
+
+      if (typeof imageData === "string" && imageData.startsWith("data:")) {
+        const ref = storage.ref().child(`challenges/${id}.jpg`);
+        await ref.putString(imageData, "data_url");
+        imageUrl = await ref.getDownloadURL();
+      }
+
+      await db.collection("challenges").doc(id).set({
+        imageUrl,
+        moves: movesValue,
+        time: timeValue,
+        size: gridSize,
+        imageMeta,
+        createdAt,
+        expiresAt,
+        challengeRule: {
+          mode: modeValue,
+          target: modeValue === "time" ? timeValue : movesValue
+        }
+      });
+
+      return id;
     }
 
-    function getGames() {
-      return JSON.parse(localStorage.getItem("games") || "[]");
+    async function loadChallengeFromUrl() {
+      const params = new URLSearchParams(location.search);
+      const id = params.get("c");
+      if (!id) return false;
+
+      const doc = await db.collection("challenges").doc(id).get();
+
+      if (!doc.exists) {
+        showPaywall("Challenge expired", "This challenge no longer exists ⏳", `<button class="action-btn secondary" onclick="goBack()">Back</button>`);
+        return false;
+      }
+
+      const data = doc.data();
+
+      if (!data || !data.imageUrl || Date.now() > Number(data.expiresAt || 0)) {
+        showPaywall("Challenge expired", "This challenge has expired ⏳", `<button class="action-btn secondary" onclick="goBack()">Back</button>`);
+        return false;
+      }
+
+      image = data.imageUrl;
+      size = Number(data.size || 3);
+      imageMeta = data.imageMeta || { width: 1, height: 1 };
+      challengeMode = true;
+      challengeLockedSize = size;
+      challengeRule = data.challengeRule || null;
+      challengeExpiresAt = Number(data.expiresAt);
+
+      persistConfig();
+      return true;
     }
+
+    function getGames() { return JSON.parse(localStorage.getItem("games") || "[]"); }
 
     function saveGame() {
+      if (!puzzleSolved) return;
+
       let games = getGames();
 
       if (games.length >= FREE_LIMIT) {
-        alert("You reached the free limit of 3 saved games. Premium coming soon 😄");
+        showPaywall("Save limit reached", "You can save up to 3 games for free. More save slots are coming soon.");
         return;
       }
 
@@ -953,68 +1339,122 @@
       });
 
       localStorage.setItem("games", JSON.stringify(games));
-      alert("Saved to Challenges!");
+      showPaywall("Saved!", "Your puzzle was saved to Challenges.");
     }
 
-    function shareGame() {
-      cleanupSharedGames();
+    function openChallengeChooser() {
+      if (!puzzleSolved) return;
 
-      const id = Date.now().toString();
-      let shared = JSON.parse(localStorage.getItem("sharedGames") || "[]");
+      showPaywall(
+        "Create challenge",
+        "Choose how your friends should try to beat your result.",
+        `
+          <button class="action-btn primary" onclick="sendChallenge('time')">⏱️ Beat my time</button>
+          <button class="action-btn secondary" onclick="sendChallenge('moves')">🧩 Beat my moves</button>
+          <button class="action-btn tertiary" onclick="hidePaywall()">Cancel</button>
+        `
+      );
+    }
 
-      shared.push({
-        id,
-        image,
-        config: { type: "puzzle", size },
-        createdAt: Date.now(),
-        moves,
-        time: elapsedSeconds
-      });
+    async function sendChallenge(modeValue) {
+      try {
+        hidePaywall();
 
-      localStorage.setItem("sharedGames", JSON.stringify(shared));
+        const id = await uploadChallenge(image, moves, elapsedSeconds, modeValue, size);
+        const link = getPublicChallengeLink(id);
 
-      const link = `${window.location.origin}${window.location.pathname}?share=${id}`;
-      const shareText = `Try my ${size}x${size} puzzle! 😄 ${link}`;
+        const shareText = modeValue === "time"
+          ? `📸🧩 Snap2Play Challenge!\nCan you beat my ${size}x${size} puzzle in ${elapsedSeconds}s?\nYou have 12h to do it 😜\nTap to play!`
+          : `📸🧩 Snap2Play Challenge!\nCan you solve my ${size}x${size} puzzle in ${moves} moves or less?\nYou have 12h to do it 😜\nTap to play!`;
 
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(link).catch(() => {});
-      }
-
-      if (navigator.share) {
-        navigator.share({
-          title: "Snap2Play",
-          text: `Try my ${size}x${size} puzzle! 😄`,
-          url: link
-        }).catch(() => {
+        if (navigator.share) {
+          await navigator.share({ title: "Snap2Play Challenge", text: shareText, url: link });
+        } else {
           fallbackShare(shareText, link);
-        });
-      } else {
-        fallbackShare(shareText, link);
+        }
+      } catch (err) {
+        console.error("sendChallenge failed", err);
+        showPaywall("Share failed", "Something went wrong while creating the challenge. Please try again.");
       }
     }
 
     function fallbackShare(shareText, link) {
-      const smsLink = `sms:?&body=${encodeURIComponent(shareText)}`;
-      const useSms = confirm(
-        "Sharing is limited in local preview.\n\nPress OK to open SMS, or Cancel to copy/show the link."
-      );
+      const fullMessage = `${shareText}\n${link}`;
+      const smsLink = `sms:?&body=${encodeURIComponent(fullMessage)}`;
+      const useSms = confirm("Press OK to open Messages, or Cancel to copy the full challenge text.");
 
-      if (useSms) {
-        window.location.href = smsLink;
-      } else {
-        prompt("Copy this link:", link);
-      }
+      if (useSms) window.location.href = smsLink;
+      else prompt("Copy this message:", fullMessage);
     }
 
-    loadShared();
+    function getPublicChallengeLink(id) {
+      return `https://snap2play-app.web.app/open.html?c=${id}`;
+    }
 
-    if (!image) {
-      window.location = "index.html";
-    } else {
+    async function initGame() {
+      const loadedFromChallenge = await loadChallengeFromUrl();
+
+      if (!loadedFromChallenge && !image) {
+        window.location = "index.html";
+        return;
+      }
+
       buildPuzzle();
     }
 
+    async function haptic(type = "light") {
+      try {
+        const Haptics = window.Capacitor?.Plugins?.Haptics;
+        if (!Haptics) return;
+
+        if (type === "success") {
+          await Haptics.notification({ type: "SUCCESS" });
+        } else if (type === "error") {
+          await Haptics.notification({ type: "ERROR" });
+        } else {
+          await Haptics.impact({ style: type.toUpperCase() });
+        }
+      } catch (e) {
+        if (navigator.vibrate) navigator.vibrate(40);
+      }
+    }
+
     window.addEventListener("resize", applyBoardAspect);
+    initGame();
+
+    function handleIncomingUrl(url) {
+      if (!url) return;
+
+      try {
+        const u = new URL(url);
+        let challengeId = u.searchParams.get("c");
+
+        if (!challengeId && u.protocol === "snap2play:" && u.hostname === "challenge") {
+          challengeId = u.searchParams.get("c");
+        }
+
+        if (challengeId) {
+          window.location.href = `game.html?c=${encodeURIComponent(challengeId)}`;
+        }
+      } catch (e) {
+        console.log("Could not parse incoming URL", e);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      if (window.Capacitor?.Plugins?.App) {
+        const App = window.Capacitor.Plugins.App;
+
+        App.addListener("appUrlOpen", (event) => {
+          handleIncomingUrl(event.url);
+        });
+
+        const launch = await App.getLaunchUrl();
+        if (launch?.url) {
+          handleIncomingUrl(launch.url);
+        }
+      }
+    });
   </script>
 </body>
 </html>

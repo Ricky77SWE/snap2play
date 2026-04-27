@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snap2Play Challenge</title>
+
+  <meta property="og:title" content="📸🧩 Snap2Play Challenge!" />
+  <meta property="og:description" content="Tap to play the puzzle challenge!" />
+  <meta property="og:image" content="https://snap2play-app.web.app/assets/logo.png" />
+  <meta property="og:type" content="website" />
+
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+      color: white;
+      background: radial-gradient(circle at top, #7b4dff, #07102d 70%);
+      text-align: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 420px;
+      padding: 28px;
+      border-radius: 28px;
+      background: rgba(255,255,255,0.12);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      backdrop-filter: blur(10px);
+    }
+    img {
+      width: 130px;
+      max-width: 60%;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 30px;
+    }
+    p {
+      opacity: 0.9;
+      font-size: 17px;
+      line-height: 1.4;
+    }
+    a {
+      display: block;
+      margin-top: 14px;
+      padding: 15px 18px;
+      border-radius: 18px;
+      color: white;
+      font-weight: 900;
+      text-decoration: none;
+      background: linear-gradient(180deg, #ffc93c, #ff8b00);
+    }
+    .secondary {
+      background: linear-gradient(180deg, #62c7ff, #2f66e8);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="assets/logo.png" alt="Snap2Play" />
+    <h1>📸🧩 Snap2Play Challenge!</h1>
+    <p>Opening the challenge...</p>
+    <a id="openApp" href="#">Open Snap2Play</a>
+    <a id="storeLink" class="secondary" href="#">Get the app</a>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const challengeId = params.get("c") || "";
+    const encodedId = encodeURIComponent(challengeId);
+
+    const IOS_APP_STORE_URL = "https://apps.apple.com/app/id6762555425";
+    const ANDROID_PLAY_URL = "https://play.google.com/store/apps/details?id=com.ricky77swe.snap2play";
+
+    const appSchemeUrl = `snap2play://challenge?c=${encodedId}`;
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const storeUrl = isAndroid ? ANDROID_PLAY_URL : IOS_APP_STORE_URL;
+
+    document.getElementById("openApp").href = appSchemeUrl;
+    document.getElementById("storeLink").href = storeUrl;
+
+    const isInsideApp =
+      window.location.protocol === "capacitor:" ||
+      window.location.hostname === "localhost";
+
+    if (isInsideApp) {
+      window.location.replace(`game.html?c=${encodedId}`);
+    } else {
+      let didHide = false;
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) didHide = true;
+      });
+
+      setTimeout(() => {
+        window.location.href = appSchemeUrl;
+      }, 300);
+
+      setTimeout(() => {
+        if (!didHide) {
+          window.location.href = storeUrl;
+        }
+      }, 1800);
+    }
+  </script>
+
+</body>
+</html>

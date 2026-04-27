@@ -100,17 +100,39 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: floatPulse 2.8s ease-in-out infinite;
+}
+
+.square-action:nth-of-type(2) {
+  animation-delay: 0.2s;
+}
+
+.challenge-btn-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: floatPulse 2.8s ease-in-out infinite;
+  animation-delay: 0.4s;
+  cursor: pointer;
+  user-select: none;
+}
+
+@keyframes floatPulse {
+  0%   { transform: translateY(0) scale(1); }
+  50%  { transform: translateY(-6px) scale(1.04); }
+  100% { transform: translateY(0) scale(1); }
 }
 
 .square-action-image {
   width: min(210px, 42vw);
+  height: auto;
   display: block;
+  object-fit: contain;
   filter: drop-shadow(0 0 16px rgba(255,255,255,0.14));
   transition: transform 0.14s ease, filter 0.14s ease;
 }
 
 .square-camera .square-action-image {
-  animation: pulse 2s infinite;
   filter: drop-shadow(0 0 14px rgba(255, 190, 0, 0.85));
 }
 
@@ -119,6 +141,9 @@ body::after {
 }
 
 .square-challenges {
+  width: min(210px, 42vw);
+  height: auto;
+  object-fit: contain;
   filter: drop-shadow(0 0 14px rgba(120, 180, 255, 0.35));
 }
 
@@ -357,6 +382,10 @@ body::after {
   }
 
   .square-action-image {
+    width: min(180px, 19vw);
+  }
+
+  .square-challenges {
     width: min(180px, 19vw);
   }
 }
